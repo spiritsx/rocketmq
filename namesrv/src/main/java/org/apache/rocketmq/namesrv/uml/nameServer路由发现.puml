@@ -1,0 +1,14 @@
+@startuml
+title nameServer路由发现
+activate DefaultRequestProcessor
+DefaultRequestProcessor -> DefaultRequestProcessor: getRouteInfoByTopic
+
+DefaultRequestProcessor -> RouteInfoManager: pickupTopicRouteData
+activate RouteInfoManager
+RouteInfoManager --> DefaultRequestProcessor: TopicRouteData
+
+deactivate RouteInfoManager
+deactivate DefaultRequestProcessor
+
+
+@enduml

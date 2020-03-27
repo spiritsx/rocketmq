@@ -1,0 +1,16 @@
+@startuml
+title nameServer处理心跳包
+activate DefaultRequestProcessor
+DefaultRequestProcessor -> DefaultRequestProcessor: processRequest
+DefaultRequestProcessor -> DefaultRequestProcessor: registerBrokerWithFilterServer
+DefaultRequestProcessor -> RouteInfoManager: registerBroker
+deactivate DefaultRequestProcessor
+
+activate RouteInfoManager
+RouteInfoManager -> RouteInfoManager: clusterAddrTable维护
+RouteInfoManager -> RouteInfoManager: brokerAddrTable维护
+RouteInfoManager -> RouteInfoManager: topicQueueTable维护
+RouteInfoManager -> RouteInfoManager: createAndUpdateQueueData
+RouteInfoManager -> RouteInfoManager: registerBroker
+deactivate RouteInfoManager
+@enduml

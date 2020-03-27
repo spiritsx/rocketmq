@@ -1,0 +1,7 @@
+@startuml
+title nameServer剔除broker
+activate RouteInfoManager
+RouteInfoManager -> RouteInfoManager: scanNotActiveBroker
+RouteInfoManager -> RouteInfoManager: onChannelDestroy
+deactivate RouteInfoManager
+@enduml

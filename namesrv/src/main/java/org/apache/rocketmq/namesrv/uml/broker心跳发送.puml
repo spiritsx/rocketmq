@@ -1,0 +1,16 @@
+@startuml
+title broker发送心跳包
+activate BrokerController
+
+BrokerController -> BrokerController : start
+BrokerController -> BrokerController : registerBrokerAll
+BrokerController -> BrokerController : doRegister
+BrokerController -> BrokerOuterAPI : registerBrokerAll
+
+activate BrokerOuterAPI
+
+BrokerOuterAPI --> BrokerController : registerBrokerResultList
+
+deactivate BrokerOuterAPI
+deactivate BrokerController
+@enduml
