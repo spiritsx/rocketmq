@@ -111,6 +111,7 @@ public class ScheduleMessageService extends ConfigManager {
     }
 
     public void start() {
+        log.info("prepare start, started:{}", started);
         if (started.compareAndSet(false, true)) {
             this.timer = new Timer("ScheduleMessageTimerThread", true);
             for (Map.Entry<Integer, Long> entry : this.delayLevelTable.entrySet()) {
@@ -131,12 +132,15 @@ public class ScheduleMessageService extends ConfigManager {
                 @Override
                 public void run() {
                     try {
+                        log.info("persist task execute");
                         if (started.get()) ScheduleMessageService.this.persist();
                     } catch (Throwable e) {
                         log.error("scheduleAtFixedRate flush exception", e);
                     }
                 }
             }, 10000, this.defaultMessageStore.getMessageStoreConfig().getFlushDelayOffsetInterval());
+        } else {
+            log.warn("schedule prepare start failed");
         }
     }
 
@@ -263,7 +267,6 @@ public class ScheduleMessageService extends ConfigManager {
             ConsumeQueue cq =
                 ScheduleMessageService.this.defaultMessageStore.findConsumeQueue(SCHEDULE_TOPIC,
                     delayLevel2QueueId(delayLevel));
-
             long failScheduleOffset = offset;
 
             if (cq != null) {
@@ -296,19 +299,20 @@ public class ScheduleMessageService extends ConfigManager {
                             nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
 
                             long countdown = deliverTimestamp - now;
-
                             if (countdown <= 0) {
+                                log.info("到达countdown，准备查询msgExt, offsetPy:{},sizePy:{}", offsetPy, sizePy);
                                 MessageExt msgExt =
                                     ScheduleMessageService.this.defaultMessageStore.lookMessageByOffset(
                                         offsetPy, sizePy);
-
+                                log.info("查询到msgExt:{}", msgExt);
                                 if (msgExt != null) {
                                     try {
                                         MessageExtBrokerInner msgInner = this.messageTimeup(msgExt);
+                                        log.info("转化为innerMsg:{}", msgInner);
                                         PutMessageResult putMessageResult =
                                             ScheduleMessageService.this.writeMessageStore
                                                 .putMessage(msgInner);
-
+                                        log.info("写入realTopic:{}", putMessageResult);
                                         if (putMessageResult != null
                                             && putMessageResult.getPutMessageStatus() == PutMessageStatus.PUT_OK) {
                                             continue;
@@ -357,7 +361,7 @@ public class ScheduleMessageService extends ConfigManager {
                     }
                 } // end of if (bufferCQ != null)
                 else {
-
+                    log.warn("当前等级[{}]的consumeQueue没能通过offset:[{}]查询到mappedBuffer", delayLevel, offset);
                     long cqMinOffset = cq.getMinOffsetInQueue();
                     if (offset < cqMinOffset) {
                         failScheduleOffset = cqMinOffset;
@@ -366,6 +370,9 @@ public class ScheduleMessageService extends ConfigManager {
                     }
                 }
             } // end of if (cq != null)
+            else {
+                log.warn("没有查询到当前等级[{}]的consumeQueue", delayLevel);
+            }
 
             ScheduleMessageService.this.timer.schedule(new DeliverDelayedMessageTimerTask(this.delayLevel,
                 failScheduleOffset), DELAY_FOR_A_WHILE);

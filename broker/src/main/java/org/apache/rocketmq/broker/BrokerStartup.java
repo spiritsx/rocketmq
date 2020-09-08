@@ -60,7 +60,7 @@ public class BrokerStartup {
 
     public static BrokerController start(BrokerController controller) {
         try {
-
+//            controller.getBrokerConfig().setNamesrvAddr("localhost:9876");
             controller.start();
 
             String tip = "The broker[" + controller.getBrokerConfig().getBrokerName() + ", "
@@ -121,6 +121,7 @@ public class BrokerStartup {
                 messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);
             }
 
+            // 如果设置了c，就通过commandLine加载配置文件
             if (commandLine.hasOption('c')) {
                 String file = commandLine.getOptionValue('c');
                 if (file != null) {
@@ -148,6 +149,10 @@ public class BrokerStartup {
             }
 
             String namesrvAddr = brokerConfig.getNamesrvAddr();
+            if (null == namesrvAddr) {
+                brokerConfig.setNamesrvAddr("localhost:9876");
+                namesrvAddr = brokerConfig.getNamesrvAddr();
+            }
             if (null != namesrvAddr) {
                 try {
                     String[] addrArray = namesrvAddr.split(";");

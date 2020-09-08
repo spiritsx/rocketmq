@@ -151,7 +151,10 @@ public class ConsumeQueue {
         }
     }
 
+    // 通过时间戳查找对应的位移，采用2分法加速查找
     public long getOffsetInQueueByTime(final long timestamp) {
+        // 在文件修改时间大于参数timestamp的mapperFile中，查找修改时间最晚的一个
+        // 如果没有修改时间大于timestamp的则取最后一个文件
         MappedFile mappedFile = this.mappedFileQueue.getMappedFileByTime(timestamp);
         if (mappedFile != null) {
             long offset = 0;
@@ -417,6 +420,14 @@ public class ConsumeQueue {
         this.defaultMessageStore.getRunningFlags().makeLogicsQueueError();
     }
 
+    /**
+     *
+     * @param offset    commitLogOffset
+     * @param size      msgSize
+     * @param tagsCode  tagsCode
+     * @param cqOffset  ConsumeQueue 中已经记录了多少条消息的偏移量
+     * @return
+     */
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
@@ -430,7 +441,7 @@ public class ConsumeQueue {
         this.byteBufferIndex.putLong(offset);
         this.byteBufferIndex.putInt(size);
         this.byteBufferIndex.putLong(tagsCode);
-
+        // 当前需要存储的消息偏移量
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
 
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
@@ -489,7 +500,7 @@ public class ConsumeQueue {
         if (offset >= this.getMinLogicOffset()) {
             MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset);
             if (mappedFile != null) {
-                SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize));
+                SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize)); // offset % mappedFileSize取余定位
                 return result;
             }
         }

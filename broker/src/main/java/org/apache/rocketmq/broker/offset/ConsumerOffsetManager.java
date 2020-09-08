@@ -138,7 +138,7 @@ public class ConsumerOffsetManager extends ConfigManager {
             }
         }
     }
-
+    // 以topic@consumerGroup作为key，从offsetTable获取offset
     public long queryOffset(final String group, final String topic, final int queueId) {
         // topic@group
         String key = topic + TOPIC_GROUP_SEPARATOR + group;

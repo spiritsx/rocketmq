@@ -313,6 +313,7 @@ public class RemotingCommand {
         return NULLABLE_FIELD_CACHE.get(field);
     }
 
+    // 获取类名并缓存
     private String getCanonicalName(Class clazz) {
         String name = CANONICAL_NAME_CACHE.get(clazz);
 

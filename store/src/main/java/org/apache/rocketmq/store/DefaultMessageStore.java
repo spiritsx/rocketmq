@@ -873,6 +873,7 @@ public class DefaultMessageStore implements MessageStore {
         long lastQueryMsgTime = end;
 
         for (int i = 0; i < 3; i++) {
+            // 从index里查到key对应的
             QueryOffsetResult queryOffsetResult = this.indexService.queryOffset(topic, key, maxNum, begin, lastQueryMsgTime);
             if (queryOffsetResult.getPhyOffsets().isEmpty()) {
                 break;
@@ -1129,9 +1130,9 @@ public class DefaultMessageStore implements MessageStore {
     public ConsumeQueue findConsumeQueue(String topic, int queueId) {
         ConcurrentMap<Integer, ConsumeQueue> map = consumeQueueTable.get(topic);
         if (null == map) {
-            ConcurrentMap<Integer, ConsumeQueue> newMap = new ConcurrentHashMap<Integer, ConsumeQueue>(128);
+            ConcurrentMap<Integer, ConsumeQueue> newMap = new ConcurrentHashMap<>(128);
             ConcurrentMap<Integer, ConsumeQueue> oldMap = consumeQueueTable.putIfAbsent(topic, newMap);
-            if (oldMap != null) {
+            if (oldMap != null) { // oldMap不为空，说明有另一个线程先调用了putIfAbsent
                 map = oldMap;
             } else {
                 map = newMap;
@@ -1438,6 +1439,7 @@ public class DefaultMessageStore implements MessageStore {
             if (brokerRole == BrokerRole.SLAVE) {
                 this.scheduleMessageService.shutdown();
             } else {
+                log.info("启动scheduleMessageService服务");
                 this.scheduleMessageService.start();
             }
         }
@@ -1890,10 +1892,12 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    log.info("prepare do doreput, first sleep 1");
                     Thread.sleep(1);
+                    log.info("end sleep 1, doreput");
                     this.doReput();
                 } catch (Exception e) {
-                    DefaultMessageStore.log.warn(this.getServiceName() + " service has exception. ", e);
+                    DefaultMessageStore.log.error(this.getServiceName() + " service has exception. ", e);
                 }
             }
 

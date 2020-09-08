@@ -102,6 +102,7 @@ public class BrokerFastFailure {
             try {
                 if (!blockingQueue.isEmpty()) {
                     final Runnable runnable = blockingQueue.peek();
+                    // 多线程控制，isEmpty和peek之间可能这个runnable任务就被取出来了，下面的==null和isStopRun同理
                     if (null == runnable) {
                         break;
                     }

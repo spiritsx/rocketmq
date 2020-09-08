@@ -1064,6 +1064,7 @@ public class MQClientInstance {
         return null;
     }
 
+    // 从brokerVersionTable里查找版本号，没有就返回0
     public int findBrokerVersion(String brokerName, String brokerAddr) {
         if (this.brokerVersionTable.containsKey(brokerName)) {
             if (this.brokerVersionTable.get(brokerName).containsKey(brokerAddr)) {

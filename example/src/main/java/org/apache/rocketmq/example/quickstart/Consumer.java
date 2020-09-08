@@ -16,14 +16,11 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
-import java.util.List;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
-import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
-import org.apache.rocketmq.common.message.MessageExt;
 
 /**
  * This example shows how to subscribe and consume messages using providing {@link DefaultMQPushConsumer}.
@@ -35,7 +32,7 @@ public class Consumer {
         /*
          * Instantiate with specified consumer group name.
          */
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("please_rename_unique_group_name_4");
+        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("wms_dynamic_hit_consumer");
 
         /*
          * Specify name server addresses.
@@ -48,7 +45,8 @@ public class Consumer {
          * }
          * </pre>
          */
-
+        consumer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
+//        consumer.setNamesrvAddr("localhost:9876");
         /*
          * Specify where to start in case the specified consumer group is a brand new one.
          */
@@ -57,21 +55,20 @@ public class Consumer {
         /*
          * Subscribe one more more topics to consume.
          */
-        consumer.subscribe("TopicTest", "*");
-
+        consumer.subscribe("dynamic_hit", "*");
+        consumer.setMaxReconsumeTimes(2);
         /*
          *  Register callback to execute on arrival of messages fetched from brokers.
          */
-        consumer.registerMessageListener(new MessageListenerConcurrently() {
-
-            @Override
-            public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs,
-                ConsumeConcurrentlyContext context) {
-                System.out.printf("%s Receive New Messages: %s %n", Thread.currentThread().getName(), msgs);
-                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+        consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
+            System.out.printf("%s Receive New Messages: %s %n", Thread.currentThread().getName(), msgs);
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
+            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
         });
-
         /*
          *  Launch the consumer instance.
          */

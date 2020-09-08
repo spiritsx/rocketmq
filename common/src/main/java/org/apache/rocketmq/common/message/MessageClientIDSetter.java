@@ -27,10 +27,11 @@ public class MessageClientIDSetter {
     private static final int LEN;
     private static final String FIX_STRING;
     private static final AtomicInteger COUNTER;
-    private static long startTime;
-    private static long nextStartTime;
+    private static long startTime;//起始时间：本月月初
+    private static long nextStartTime;//结束时间：下月月初
 
     static {
+        // 消息头长度16，由ip(4),pid(2),classLoader的hash码(4),起始时间差值(4),计数(2)组成
         LEN = 4 + 2 + 4 + 4 + 2;
         ByteBuffer tempBuffer = ByteBuffer.allocate(10);
         tempBuffer.position(2);

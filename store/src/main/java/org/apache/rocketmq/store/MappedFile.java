@@ -42,17 +42,21 @@ import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
 public class MappedFile extends ReferenceResource {
-    public static final int OS_PAGE_SIZE = 1024 * 4;
+    public static final int OS_PAGE_SIZE = 1024 * 4;//操作系统页缓存大小
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
-
+    // JVM映射虚拟内存总大小
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
-
+    // JVM中mmap数量
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+    // 当前写文件位置
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
-    //ADD BY ChenYang
+    //ADD BY ChenYang 当前提交位置
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
+    // 当前刷盘位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
+    // 文件大小
     protected int fileSize;
+    // 文件映射
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
@@ -60,9 +64,13 @@ public class MappedFile extends ReferenceResource {
     protected ByteBuffer writeBuffer = null;
     protected TransientStorePool transientStorePool = null;
     private String fileName;
+    // 这个是文件的物理offset，可以从文件命名看出来
     private long fileFromOffset;
+    // 文件
     private File file;
+    // 映射的buffer对象
     private MappedByteBuffer mappedByteBuffer;
+    // 最后一条消息保存时间
     private volatile long storeTimestamp = 0;
     private boolean firstCreateInQueue = false;
 
@@ -201,7 +209,7 @@ public class MappedFile extends ReferenceResource {
     public AppendMessageResult appendMessagesInner(final MessageExt messageExt, final AppendMessageCallback cb) {
         assert messageExt != null;
         assert cb != null;
-
+        // 先获取当前写指针
         int currentPos = this.wrotePosition.get();
 
         if (currentPos < this.fileSize) {
@@ -268,6 +276,8 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
+     * 将内存中的数据刷盘
+     *
      * @return The current flushed position
      */
     public int flush(final int flushLeastPages) {
@@ -319,6 +329,7 @@ public class MappedFile extends ReferenceResource {
         return this.committedPosition.get();
     }
 
+    // 提交是指将MappedFile的writeBuffer中数据提交到FileChannel中
     protected void commit0(final int commitLeastPages) {
         int writePos = this.wrotePosition.get();
         int lastCommittedPosition = this.committedPosition.get();

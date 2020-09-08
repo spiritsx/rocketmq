@@ -38,6 +38,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             faultItem.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
 
             old = this.faultItemTable.putIfAbsent(name, faultItem);
+            // 这里是考虑并发？
             if (old != null) {
                 old.setCurrentLatency(currentLatency);
                 old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
@@ -98,6 +99,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     class FaultItem implements Comparable<FaultItem> {
         private final String name;
+        // 2个变量均用volatile修饰，并发时可见性，配合上面的update方法一起食用
         private volatile long currentLatency;
         private volatile long startTimestamp;
 
@@ -130,6 +132,8 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             return 0;
         }
 
+        // 这里用当前时间减去startTimestamp是因为startTimestamp是用设置的时间戳+延时时间
+        // 吐槽一下，真的是瞎几把写。可读性极差。。
         public boolean isAvailable() {
             return (System.currentTimeMillis() - startTimestamp) >= 0;
         }

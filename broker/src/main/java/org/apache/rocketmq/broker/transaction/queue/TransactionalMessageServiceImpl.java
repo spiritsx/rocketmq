@@ -130,6 +130,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             log.debug("Check topic={}, queues={}", topic, msgQueues);
             for (MessageQueue messageQueue : msgQueues) {
                 long startTime = System.currentTimeMillis();
+                // 通过halfQueue构建opQueue
                 MessageQueue opQueue = getOpQueue(messageQueue);
                 long halfOffset = transactionalMessageBridge.fetchConsumeOffset(messageQueue);
                 long opOffset = transactionalMessageBridge.fetchConsumeOffset(opQueue);
@@ -141,6 +142,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                 }
 
                 List<Long> doneOpOffset = new ArrayList<>();
+                // Half message to be remove, key:halfOffset, value: opOffset.
                 HashMap<Long, Long> removeMap = new HashMap<>();
                 PullResult pullResult = fillOpRemoveMap(removeMap, opQueue, opOffset, halfOffset, doneOpOffset);
                 if (null == pullResult) {
@@ -149,21 +151,22 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                     continue;
                 }
                 // single thread
-                int getMessageNullCount = 1;
+                int getMessageNullCount = 1; // 获取空消息的次数
                 long newOffset = halfOffset;
-                long i = halfOffset;
+                long i = halfOffset;  // 1
                 while (true) {
-                    if (System.currentTimeMillis() - startTime > MAX_PROCESS_TIME_LIMIT) {
+                    // 每个队列处理时间只有60s
+                    if (System.currentTimeMillis() - startTime > MAX_PROCESS_TIME_LIMIT) { // 2
                         log.info("Queue={} process time reach max={}", messageQueue, MAX_PROCESS_TIME_LIMIT);
                         break;
                     }
-                    if (removeMap.containsKey(i)) {
+                    if (removeMap.containsKey(i)) { // 3
                         log.info("Half offset {} has been committed/rolled back", i);
                         removeMap.remove(i);
                     } else {
-                        GetResult getResult = getHalfMsg(messageQueue, i);
+                        GetResult getResult = getHalfMsg(messageQueue, i); // 4
                         MessageExt msgExt = getResult.getMsg();
-                        if (msgExt == null) {
+                        if (msgExt == null) { // 5
                             if (getMessageNullCount++ > MAX_RETRY_COUNT_WHEN_HALF_NULL) {
                                 break;
                             }
@@ -180,7 +183,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             }
                         }
 
-                        if (needDiscard(msgExt, transactionCheckMax) || needSkip(msgExt)) {
+                        if (needDiscard(msgExt, transactionCheckMax) || needSkip(msgExt)) { // 6
                             listener.resolveDiscardMsg(msgExt);
                             newOffset = i + 1;
                             i++;
@@ -192,10 +195,14 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             break;
                         }
 
-                        long valueOfCurrentMinusBorn = System.currentTimeMillis() - msgExt.getBornTimestamp();
+                        // 事务存储的时间
+                        long valueOfCurrentMinusBorn = System.currentTimeMillis() - msgExt.getBornTimestamp(); // 7
+                        // 发送事务消息和事务提交的时间差值，在这段时间内，不应当回查
                         long checkImmunityTime = transactionTimeout;
+                        // 事务消息过期时间属性
                         String checkImmunityTimeStr = msgExt.getUserProperty(MessageConst.PROPERTY_CHECK_IMMUNITY_TIME_IN_SECONDS);
-                        if (null != checkImmunityTimeStr) {
+                        if (null != checkImmunityTimeStr) { // 8
+                            //
                             checkImmunityTime = getImmunityTime(checkImmunityTimeStr, transactionTimeout);
                             if (valueOfCurrentMinusBorn < checkImmunityTime) {
                                 if (checkPrepareQueueOffset(removeMap, doneOpOffset, msgExt)) {
@@ -204,7 +211,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                                     continue;
                                 }
                             }
-                        } else {
+                        } else { // 9
                             if ((0 <= valueOfCurrentMinusBorn) && (valueOfCurrentMinusBorn < checkImmunityTime)) {
                                 log.debug("New arrived, the miss offset={}, check it later checkImmunity={}, born={}", i,
                                     checkImmunityTime, new Date(msgExt.getBornTimestamp()));
@@ -214,10 +221,10 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                         List<MessageExt> opMsg = pullResult.getMsgFoundList();
                         boolean isNeedCheck = (opMsg == null && valueOfCurrentMinusBorn > checkImmunityTime)
                             || (opMsg != null && (opMsg.get(opMsg.size() - 1).getBornTimestamp() - startTime > transactionTimeout))
-                            || (valueOfCurrentMinusBorn <= -1);
+                            || (valueOfCurrentMinusBorn <= -1); // 10
 
                         if (isNeedCheck) {
-                            if (!putBackHalfMsgQueue(msgExt, i)) {
+                            if (!putBackHalfMsgQueue(msgExt, i)) { // 11
                                 continue;
                             }
                             listener.resolveHalfMsg(msgExt);
@@ -231,11 +238,11 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                     newOffset = i + 1;
                     i++;
                 }
-                if (newOffset != halfOffset) {
+                if (newOffset != halfOffset) { // 13
                     transactionalMessageBridge.updateConsumeOffset(messageQueue, newOffset);
                 }
                 long newOpOffset = calculateOpOffset(doneOpOffset, opOffset);
-                if (newOpOffset != opOffset) {
+                if (newOpOffset != opOffset) { // 14
                     transactionalMessageBridge.updateConsumeOffset(opQueue, newOpOffset);
                 }
             }
@@ -295,6 +302,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             log.info("Topic: {} tags: {}, OpOffset: {}, HalfOffset: {}", opMessageExt.getTopic(),
                 opMessageExt.getTags(), opMessageExt.getQueueOffset(), queueOffset);
             if (TransactionalMessageUtil.REMOVETAG.equals(opMessageExt.getTags())) {
+                // 如果消息tag有个d的话，op_message里数据不是已经被处理就是即将被处理
                 if (queueOffset < miniOffset) {
                     doneOpOffset.add(opMessageExt.getQueueOffset());
                 } else {

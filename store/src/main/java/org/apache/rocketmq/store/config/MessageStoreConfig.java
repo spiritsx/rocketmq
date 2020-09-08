@@ -23,6 +23,7 @@ import org.apache.rocketmq.store.ConsumeQueue;
 public class MessageStoreConfig {
     //The root directory in which the log data is kept
     @ImportantField
+    // c:\Users\Administrator\store
     private String storePathRootDir = System.getProperty("user.home") + File.separator + "store";
 
     //The directory in which the commitlog is kept
@@ -44,7 +45,7 @@ public class MessageStoreConfig {
 
     // CommitLog flush interval
     // flush data to disk
-    @ImportantField
+    @ImportantField // commitlog刷盘间隔500ms
     private int flushIntervalCommitLog = 500;
 
     // Only used if TransientStorePool enabled
@@ -72,11 +73,11 @@ public class MessageStoreConfig {
     private int destroyMapedFileIntervalForcibly = 1000 * 120;
     private int redeleteHangedFileInterval = 1000 * 120;
     // When to delete,default is at 4 am
-    @ImportantField
+    @ImportantField // 每天4点删除
     private String deleteWhen = "04";
     private int diskMaxUsedSpaceRatio = 75;
     // The number of hours to keep a log file before deleting it (in hours)
-    @ImportantField
+    @ImportantField // 文件保存时间 3天
     private int fileReservedTime = 72;
     // Flow control for ConsumeQueue
     private int putMsgIndexHightWater = 600000;
@@ -126,7 +127,8 @@ public class MessageStoreConfig {
     @ImportantField
     private FlushDiskType flushDiskType = FlushDiskType.ASYNC_FLUSH;
     private int syncFlushTimeout = 1000 * 5;
-    private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
+//    private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
+    private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m";
     private long flushDelayOffsetInterval = 1000 * 10;
     @ImportantField
     private boolean cleanFileForciblyEnable = true;

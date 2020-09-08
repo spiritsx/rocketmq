@@ -128,12 +128,12 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
         long offset =
             this.brokerController.getConsumerOffsetManager().queryOffset(
                 requestHeader.getConsumerGroup(), requestHeader.getTopic(), requestHeader.getQueueId());
-
+        // 如果从offsetTable能获取到，就直接返回
         if (offset >= 0) {
             responseHeader.setOffset(offset);
             response.setCode(ResponseCode.SUCCESS);
             response.setRemark(null);
-        } else {
+        } else {//否则尝试通过ConsumeQueue文件获取最小位移
             long minOffset =
                 this.brokerController.getMessageStore().getMinOffsetInQueue(requestHeader.getTopic(),
                     requestHeader.getQueueId());

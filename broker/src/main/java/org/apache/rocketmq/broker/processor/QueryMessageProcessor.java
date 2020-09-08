@@ -78,12 +78,12 @@ public class QueryMessageProcessor implements NettyRequestProcessor {
                 .decodeCommandCustomHeader(QueryMessageRequestHeader.class);
 
         response.setOpaque(request.getOpaque());
-
+        // 如果设置了isUniqueKey为true，就设置返回大小为服务端配置的最大值，否则为客户端最大值
         String isUniqueKey = request.getExtFields().get(MixAll.UNIQUE_MSG_QUERY_FLAG);
         if (isUniqueKey != null && isUniqueKey.equals("true")) {
             requestHeader.setMaxNum(this.brokerController.getMessageStoreConfig().getDefaultQueryMaxNum());
         }
-
+        // 设置最大值为请求时默认值
         final QueryMessageResult queryMessageResult =
             this.brokerController.getMessageStore().queryMessage(requestHeader.getTopic(),
                 requestHeader.getKey(), requestHeader.getMaxNum(), requestHeader.getBeginTimestamp(),

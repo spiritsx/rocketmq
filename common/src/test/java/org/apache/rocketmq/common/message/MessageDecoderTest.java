@@ -21,8 +21,10 @@ import org.junit.Test;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,5 +78,14 @@ public class MessageDecoderTest {
         assertThat("123").isEqualTo(properties.get("a"));
         assertThat("hello").isEqualTo(properties.get("b"));
         assertThat("3.14").isEqualTo(properties.get("c"));
+    }
+
+    @Test
+    public void testIp() throws UnknownHostException {
+        SocketAddress socketAddress = new InetSocketAddress("172.16.7.114", 10911);
+        ByteBuffer buffer = MessageExt.socketAddress2ByteBuffer(socketAddress);
+        System.out.println(Arrays.toString(buffer.array()));
+        MessageId messageId = MessageDecoder.decodeMessageId("AC155AAC265418B4AAC20246E9580063");
+        System.out.println(messageId);
     }
 }

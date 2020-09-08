@@ -75,19 +75,19 @@ public class MappedFileQueue {
     }
 
     public MappedFile getMappedFileByTime(final long timestamp) {
-        Object[] mfs = this.copyMappedFiles(0);
+        Object[] mappedFiles = this.copyMappedFiles(0);
 
-        if (null == mfs)
+        if (null == mappedFiles)
             return null;
 
-        for (int i = 0; i < mfs.length; i++) {
-            MappedFile mappedFile = (MappedFile) mfs[i];
+        for (int i = 0; i < mappedFiles.length; i++) {
+            MappedFile mappedFile = (MappedFile) mappedFiles[i];
             if (mappedFile.getLastModifiedTimestamp() >= timestamp) {
                 return mappedFile;
             }
         }
 
-        return (MappedFile) mfs[mfs.length - 1];
+        return (MappedFile) mappedFiles[mappedFiles.length - 1];
     }
 
     private Object[] copyMappedFiles(final int reservedMappedFiles) {
@@ -464,6 +464,7 @@ public class MappedFileQueue {
             MappedFile firstMappedFile = this.getFirstMappedFile();
             MappedFile lastMappedFile = this.getLastMappedFile();
             if (firstMappedFile != null && lastMappedFile != null) {
+                // offset小于第一个文件的起始offset，或者大于最后一个文件的起始offset加一整个文件的offset，就不匹配，报出警告
                 if (offset < firstMappedFile.getFileFromOffset() || offset >= lastMappedFile.getFileFromOffset() + this.mappedFileSize) {
                     LOG_ERROR.warn("Offset not matched. Request offset: {}, firstOffset: {}, lastOffset: {}, mappedFileSize: {}, mappedFiles count: {}",
                         offset,
@@ -472,18 +473,19 @@ public class MappedFileQueue {
                         this.mappedFileSize,
                         this.mappedFiles.size());
                 } else {
+                    // index是文件列表的索引，通过2个位移的差值都除以单个文件的大小计算得出
                     int index = (int) ((offset / this.mappedFileSize) - (firstMappedFile.getFileFromOffset() / this.mappedFileSize));
                     MappedFile targetFile = null;
                     try {
                         targetFile = this.mappedFiles.get(index);
                     } catch (Exception ignored) {
                     }
-
+                    // offset落在了targetFile中间
                     if (targetFile != null && offset >= targetFile.getFileFromOffset()
                         && offset < targetFile.getFileFromOffset() + this.mappedFileSize) {
                         return targetFile;
                     }
-
+                    // offset没落在targetFile中间，需要一个个迭代
                     for (MappedFile tmpMappedFile : this.mappedFiles) {
                         if (offset >= tmpMappedFile.getFileFromOffset()
                             && offset < tmpMappedFile.getFileFromOffset() + this.mappedFileSize) {
@@ -491,7 +493,7 @@ public class MappedFileQueue {
                         }
                     }
                 }
-
+                // 还没找到，估计有问题，如果设置了没找到还返回的话就返回第一个
                 if (returnFirstOnNotFound) {
                     return firstMappedFile;
                 }

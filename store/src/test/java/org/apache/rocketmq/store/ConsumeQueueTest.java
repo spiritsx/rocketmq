@@ -76,7 +76,7 @@ public class ConsumeQueueTest {
         msg.setStoreHost(StoreHost);
         msg.setBornHost(BornHost);
         for (int i = 0; i < 1; i++) {
-            msg.putUserProperty(String.valueOf(i), "imagoodperson" + i);
+            msg.putUserProperty(String.valueOf(i), "i am good person" + i);
         }
         msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
 
