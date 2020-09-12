@@ -45,8 +45,8 @@ public class Consumer {
          * }
          * </pre>
          */
-        consumer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
-//        consumer.setNamesrvAddr("localhost:9876");
+//        consumer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
+        consumer.setNamesrvAddr("localhost:9876");
         /*
          * Specify where to start in case the specified consumer group is a brand new one.
          */
@@ -67,7 +67,7 @@ public class Consumer {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+            return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
         });
         /*
          *  Launch the consumer instance.

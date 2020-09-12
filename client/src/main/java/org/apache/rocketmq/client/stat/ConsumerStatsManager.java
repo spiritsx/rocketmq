@@ -60,7 +60,7 @@ public class ConsumerStatsManager {
 
     public void shutdown() {
     }
-
+    // rt = result time，可以理解为耗时
     public void incPullRT(final String group, final String topic, final long rt) {
         this.topicAndGroupPullRT.addValue(topic + "@" + group, (int) rt, 1);
     }

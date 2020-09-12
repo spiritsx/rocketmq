@@ -44,12 +44,12 @@ public class Producer {
          * }
          * </pre>
          */
-        producer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
-//        producer.setNamesrvAddr("127.0.0.1:9876");
+//        producer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
+        producer.setNamesrvAddr("127.0.0.1:9876");
         /*
          * Launch the instance.
          */
-        producer.setSendMsgTimeout(150000);
+        producer.setSendMsgTimeout(1500);
         producer.setRetryTimesWhenSendFailed(3);
         producer.start();
 
@@ -68,7 +68,7 @@ public class Producer {
                  * Call send message to deliver message to one of brokers.
                  */
                 SendResult sendResult = producer.send(msg);
-                Thread.sleep(2000);
+                Thread.sleep(1000);
                 System.out.printf("%s%n", sendResult);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -79,6 +79,6 @@ public class Producer {
         /*
          * Shut down once the producer instance is not longer in use.
          */
-        producer.shutdown();
+//        producer.shutdown();
     }
 }

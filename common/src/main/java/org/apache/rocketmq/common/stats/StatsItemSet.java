@@ -42,7 +42,7 @@ public class StatsItemSet {
     }
 
     public void init() {
-
+        // 10秒一次，采样收集秒级别，存放到csListMinute
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -52,7 +52,7 @@ public class StatsItemSet {
                 }
             }
         }, 0, 10, TimeUnit.SECONDS);
-
+        // 10分钟一次，采样收集分钟级别，存放到csListHour
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -62,7 +62,7 @@ public class StatsItemSet {
                 }
             }
         }, 0, 10, TimeUnit.MINUTES);
-
+        // 1小时一次，采样收集小时级别数据，存放到csListDay
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -72,7 +72,7 @@ public class StatsItemSet {
                 }
             }
         }, 0, 1, TimeUnit.HOURS);
-
+        // 1分钟一次，
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {

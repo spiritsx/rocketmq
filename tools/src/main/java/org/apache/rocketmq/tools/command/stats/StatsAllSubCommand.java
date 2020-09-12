@@ -56,6 +56,7 @@ public class StatsAllSubCommand implements SubCommand {
                     inTPS += bsd.getStatsMinute().getTps();
                     inMsgCntToday += compute24HourSum(bsd);
                 } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         }
@@ -75,6 +76,7 @@ public class StatsAllSubCommand implements SubCommand {
                             outTPS += bsd.getStatsMinute().getTps();
                             outMsgCntToday += compute24HourSum(bsd);
                         } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
                 }
@@ -89,6 +91,7 @@ public class StatsAllSubCommand implements SubCommand {
                         }
                     }
                 } catch (Exception e) {
+                    e.printStackTrace();
                 }
 
                 if (!activeTopic || (inMsgCntToday > 0) ||
