@@ -44,28 +44,30 @@ public class ProcessQueue {
     private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty("rocketmq.client.pull.pullMaxIdleTime", "120000"));
     private final InternalLogger log = ClientLogger.getLog();
     private final ReadWriteLock lockTreeMap = new ReentrantReadWriteLock();
-    private final TreeMap<Long, MessageExt> msgTreeMap = new TreeMap<Long, MessageExt>();
-    private final AtomicLong msgCount = new AtomicLong();
-    private final AtomicLong msgSize = new AtomicLong();
+    // 消息存储容器, key:消息在consumeQueue中偏移量,value：消息实体
+    private final TreeMap<Long /*consumeQueue偏移量*/, MessageExt> msgTreeMap = new TreeMap<>();
+    private final AtomicLong msgCount = new AtomicLong(); // ProcessQueue中消息总数
+    private final AtomicLong msgSize = new AtomicLong(); // ProcessQueue中消息总大小
     private final Lock lockConsume = new ReentrantLock();
     /**
      * A subset of msgTreeMap, will only be used when orderly consume
+     * 只用于处理顺序消息，消费线程从msgTreeMap取出消息前，先将消息临时存储在consumingMsgOrderlyTreeMap中
      */
-    private final TreeMap<Long, MessageExt> consumingMsgOrderlyTreeMap = new TreeMap<Long, MessageExt>();
+    private final TreeMap<Long, MessageExt> consumingMsgOrderlyTreeMap = new TreeMap<>();
     private final AtomicLong tryUnlockTimes = new AtomicLong(0);
-    private volatile long queueOffsetMax = 0L;
-    private volatile boolean dropped = false;
+    private volatile long queueOffsetMax = 0L; // 当前ProcessQueue中包含的最大队列偏移量
+    private volatile boolean dropped = false; // 当前ProcessQueue是否被丢弃
     private volatile long lastPullTimestamp = System.currentTimeMillis();
     private volatile long lastConsumeTimestamp = System.currentTimeMillis();
     private volatile boolean locked = false;
     private volatile long lastLockTimestamp = System.currentTimeMillis();
     private volatile boolean consuming = false;
     private volatile long msgAccCnt = 0;
-
+    // 判断锁是否过期
     public boolean isLockExpired() {
         return (System.currentTimeMillis() - this.lastLockTimestamp) > REBALANCE_LOCK_MAX_LIVE_TIME;
     }
-
+    // 判断拉取是否空闲
     public boolean isPullExpired() {
         return (System.currentTimeMillis() - this.lastPullTimestamp) > PULL_MAX_IDLE_TIME;
     }
@@ -122,7 +124,7 @@ public class ProcessQueue {
             }
         }
     }
-
+    // PullMessageService拉取消息后，先调用这个方法将消息存到ProcessQueue中
     public boolean putMessage(final List<MessageExt> msgs) {
         boolean dispatchToConsume = false;
         try {
@@ -296,7 +298,7 @@ public class ProcessQueue {
     }
 
     public List<MessageExt> takeMessags(final int batchSize) {
-        List<MessageExt> result = new ArrayList<MessageExt>(batchSize);
+        List<MessageExt> result = new ArrayList<>(batchSize);
         final long now = System.currentTimeMillis();
         try {
             this.lockTreeMap.writeLock().lockInterruptibly();

@@ -45,7 +45,7 @@ public class FilterAPI {
         if (null == subString || subString.equals(SubscriptionData.SUB_ALL) || subString.length() == 0) {
             subscriptionData.setSubString(SubscriptionData.SUB_ALL);
         } else {
-            String[] tags = subString.split("\\|\\|");
+            String[] tags = subString.split("\\|\\|"); // 转义 ||
             if (tags.length > 0) {
                 for (String tag : tags) {
                     if (tag.length() > 0) {

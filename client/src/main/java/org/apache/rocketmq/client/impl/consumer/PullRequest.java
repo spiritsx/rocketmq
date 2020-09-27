@@ -22,8 +22,8 @@ public class PullRequest {
     private String consumerGroup;
     private MessageQueue messageQueue;
     private ProcessQueue processQueue;
-    private long nextOffset;
-    private boolean lockedFirst = false;
+    private long nextOffset; // 待拉取的MessageQueue偏移量
+    private boolean lockedFirst = false; // 是否被锁定
 
     public boolean isLockedFirst() {
         return lockedFirst;
