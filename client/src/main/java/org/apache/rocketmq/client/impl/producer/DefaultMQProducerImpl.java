@@ -265,7 +265,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     @Override
     public boolean isPublishTopicNeedUpdate(String topic) {
         TopicPublishInfo prev = this.topicPublishInfoTable.get(topic);
-
+        // 判断需要更新的依据是topic发送路由为空或路由里的messageQueue为空
         return null == prev || !prev.ok();
     }
 
@@ -717,9 +717,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     msgBodyCompressed = true;
                 }
 
-                final String tranMsg = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);
+                final String tranMsg = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED); // 查看是否有事务消息的标志
                 if (tranMsg != null && Boolean.parseBoolean(tranMsg)) {
-                    sysFlag |= MessageSysFlag.TRANSACTION_PREPARED_TYPE;
+                    sysFlag |= MessageSysFlag.TRANSACTION_PREPARED_TYPE; // 如果设置了，系统消息并上prepareType
                 }
 
                 if (hasCheckForbiddenHook()) {
@@ -1182,10 +1182,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         Validators.checkMessage(msg, this.defaultMQProducer);
 
         SendResult sendResult = null;
-        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true");
-        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());
+        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true"); // 设置事务消息标志
+        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup()); // 设置生产者组
         try {
-            sendResult = this.send(msg);
+            sendResult = this.send(msg); // 发送到MQ
         } catch (Exception e) {
             throw new MQClientException("send message Exception", e);
         }

@@ -48,7 +48,9 @@ public class TransactionalMessageCheckService extends ServiceThread {
 
     @Override
     protected void onWaitEnd() {
+        // 事务消息过期时间，如果消息存储时间+事务消息过期时间> 当前时间, 就意味着过期，这时候才会回查这条消息
         long timeout = brokerController.getBrokerConfig().getTransactionTimeOut();
+        // 事务消息最大回查次数，如果超过最大回查次数还是无法探知消息的状态（commit/rollback）就丢弃消息
         int checkMax = brokerController.getBrokerConfig().getTransactionCheckMax();
         long begin = System.currentTimeMillis();
         log.info("Begin to check prepare message, begin time:{}", begin);

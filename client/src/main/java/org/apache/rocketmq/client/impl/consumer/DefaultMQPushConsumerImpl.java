@@ -311,24 +311,25 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
                             long pullRT = System.currentTimeMillis() - beginTimestamp;
                             DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullRT(pullRequest.getConsumerGroup(),
-                                pullRequest.getMessageQueue().getTopic(), pullRT);
+                                pullRequest.getMessageQueue().getTopic(), pullRT); // 统计请求消息的响应时间
 
                             long firstMsgOffset = Long.MAX_VALUE;
+                            // 没拉取到消息，把请求放回请求队列
                             if (pullResult.getMsgFoundList() == null || pullResult.getMsgFoundList().isEmpty()) {
                                 DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             } else {
                                 firstMsgOffset = pullResult.getMsgFoundList().get(0).getQueueOffset();
-
+                                // 统计请求消息TPS
                                 DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(),
                                     pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
-
+                                // 将消息放到processQueue，再放到ConsumeMessageService中消费
                                 boolean dispatchToConsume = processQueue.putMessage(pullResult.getMsgFoundList());
                                 DefaultMQPushConsumerImpl.this.consumeMessageService.submitConsumeRequest(
                                     pullResult.getMsgFoundList(),
                                     processQueue,
                                     pullRequest.getMessageQueue(),
                                     dispatchToConsume);
-
+                                // 根据拉取间隔分配下一次拉取时间，如果间隔大于0，等待拉取间隔后再将pullRequest放入PullRequestQueue中
                                 if (DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval() > 0) {
                                     DefaultMQPushConsumerImpl.this.executePullRequestLater(pullRequest,
                                         DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval());
@@ -347,25 +348,27 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             }
 
                             break;
-                        case NO_NEW_MSG:
+                        // NO_NEW_MSG和NO_MATCHED_MSG，直接根据broker返回的修正offset进行拉取
+                        case NO_NEW_MSG: // 对应GetMessageResult.OFFSET_FOUND_NULL、GetMessageResult.OFFSET_OVERFLOW_ONE
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
 
                             DefaultMQPushConsumerImpl.this.correctTagsOffset(pullRequest);
 
                             DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             break;
-                        case NO_MATCHED_MSG:
+                        case NO_MATCHED_MSG: //
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
 
                             DefaultMQPushConsumerImpl.this.correctTagsOffset(pullRequest);
 
                             DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             break;
-                        case OFFSET_ILLEGAL:
+                        // OFFSET_ILLEGAL，丢弃该消费队列
+                        case OFFSET_ILLEGAL: // 对应GetMessageResult.NO_MATCHED_LOGIN_QUEUE、NO_MESSAGE_IN_QUEUE、OFFSET_OVERFLOW_BADLY、OFFSET_TOO_SMALL
                             log.warn("the pull request offset illegal, {} {}",
                                 pullRequest.toString(), pullResult.toString());
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
-
+                            // 设置drop为true，停止消费，10秒后，持久化对应messageQueue的offset，再从rebalanceImpl中移除
                             pullRequest.getProcessQueue().setDropped(true);
                             DefaultMQPushConsumerImpl.this.executeTaskLater(new Runnable() {
 
@@ -410,7 +413,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 commitOffsetEnable = true;
             }
         }
-
+        // 构建消息拉取系统标记
         String subExpression = null;
         boolean classFilter = false;
         SubscriptionData sd = this.rebalanceImpl.getSubscriptionInner().get(pullRequest.getMessageQueue().getTopic());
@@ -596,10 +599,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     this.offsetStore = this.defaultMQPushConsumer.getOffsetStore();
                 } else {
                     switch (this.defaultMQPushConsumer.getMessageModel()) {
-                        case BROADCASTING:
+                        case BROADCASTING: // 广播消费，自己保存offset
                             this.offsetStore = new LocalFileOffsetStore(this.mQClientFactory, this.defaultMQPushConsumer.getConsumerGroup());
                             break;
-                        case CLUSTERING:
+                        case CLUSTERING: // 集群消费，使用服务端的offset
                             this.offsetStore = new RemoteBrokerOffsetStore(this.mQClientFactory, this.defaultMQPushConsumer.getConsumerGroup());
                             break;
                         default:
@@ -865,7 +868,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         if (subTable != null) {
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
-                this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
+                this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic); // 拿到每个topic最新的路由消息
             }
         }
     }
@@ -1038,6 +1041,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
     @Override
     public boolean isSubscribeTopicNeedUpdate(String topic) {
+        // 先看看subscriptionInner有没有topic，再看看topicSubscribeInfo里有没有topic
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
             if (subTable.containsKey(topic)) {

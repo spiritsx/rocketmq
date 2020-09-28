@@ -217,7 +217,7 @@ public abstract class RebalanceImpl {
     }
 
     public void doRebalance(final boolean isOrder) {
-        Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
+        Map<String /*topic*/, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
@@ -366,7 +366,7 @@ public abstract class RebalanceImpl {
             }
         }
 
-        List<PullRequest> pullRequestList = new ArrayList<PullRequest>();
+        List<PullRequest> pullRequestList = new ArrayList<>();
         for (MessageQueue mq : mqSet) {
             if (!this.processQueueTable.containsKey(mq)) {
                 if (isOrder && !this.lock(mq)) {

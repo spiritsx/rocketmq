@@ -204,6 +204,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         final MessageQueue messageQueue,
         final boolean dispatchToConsume) {
         final int consumeBatchSize = this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
+        // 这一批次消息小于每次消费的数量，直接提交消费任务
         if (msgs.size() <= consumeBatchSize) {
             ConsumeRequest consumeRequest = new ConsumeRequest(msgs, processQueue, messageQueue);
             try {
@@ -212,6 +213,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 this.submitConsumeRequestLater(consumeRequest);
             }
         } else {
+            // 这一批次消息大于每次消费的数量，分批次消费
             for (int total = 0; total < msgs.size(); ) {
                 List<MessageExt> msgThis = new ArrayList<MessageExt>(consumeBatchSize);
                 for (int i = 0; i < consumeBatchSize; i++, total++) {
@@ -225,7 +227,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 ConsumeRequest consumeRequest = new ConsumeRequest(msgThis, processQueue, messageQueue);
                 try {
                     this.consumeExecutor.submit(consumeRequest);
-                } catch (RejectedExecutionException e) {
+                } catch (RejectedExecutionException e) { // 线程池满了，先全部加载到msgThis，过一会儿全部提交到线程池
                     for (; total < msgs.size(); total++) {
                         msgThis.add(msgs.get(total));
                     }

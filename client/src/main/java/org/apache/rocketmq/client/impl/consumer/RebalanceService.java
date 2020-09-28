@@ -22,7 +22,7 @@ import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.logging.InternalLogger;
 
 public class RebalanceService extends ServiceThread {
-    private static long waitInterval =
+    private static long waitInterval = // 每隔20s查看有没有rebalance
         Long.parseLong(System.getProperty(
             "rocketmq.client.rebalance.waitInterval", "20000"));
     private final InternalLogger log = ClientLogger.getLog();

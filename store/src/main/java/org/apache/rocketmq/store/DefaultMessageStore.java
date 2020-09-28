@@ -514,23 +514,24 @@ public class DefaultMessageStore implements MessageStore {
             minOffset = consumeQueue.getMinOffsetInQueue();
             maxOffset = consumeQueue.getMaxOffsetInQueue();
 
-            if (maxOffset == 0) {
+            if (maxOffset == 0) { // 没有消息，修正下一次拉取offset为0
                 status = GetMessageStatus.NO_MESSAGE_IN_QUEUE;
                 nextBeginOffset = nextOffsetCorrection(offset, 0);
-            } else if (offset < minOffset) {
+            } else if (offset < minOffset) { // 目标offset比起始offset还小，修正下一次拉取offset为起始offset
                 status = GetMessageStatus.OFFSET_TOO_SMALL;
                 nextBeginOffset = nextOffsetCorrection(offset, minOffset);
-            } else if (offset == maxOffset) {
+            } else if (offset == maxOffset) {// 目标offset等于最大offset，修正下一次拉取offset为offset
                 status = GetMessageStatus.OFFSET_OVERFLOW_ONE;
                 nextBeginOffset = nextOffsetCorrection(offset, offset);
-            } else if (offset > maxOffset) {
+            } else if (offset > maxOffset) { // 目标offset大于最大offset
                 status = GetMessageStatus.OFFSET_OVERFLOW_BADLY;
-                if (0 == minOffset) {
+                if (0 == minOffset) { // 起始便宜为0，修正下一次拉取offset为起始offset
                     nextBeginOffset = nextOffsetCorrection(offset, minOffset);
-                } else {
+                } else { // 起始偏移不为0，修正下一次拉取offset为最大offset
                     nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
                 }
-            } else {
+            } else { // 目标offset正常，即 minOffset< offset < maxOffset 准备拉取消息
+                // 找到consumeQueue文件
                 SelectMappedBufferResult bufferConsumeQueue = consumeQueue.getIndexBuffer(offset);
                 if (bufferConsumeQueue != null) {
                     try {
@@ -616,7 +617,7 @@ public class DefaultMessageStore implements MessageStore {
                         }
 
                         nextBeginOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
-
+                        // 根据偏移量和内存使用率设置下一次拉取建议
                         long diff = maxOffsetPy - maxPhyOffsetPulling;
                         long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE
                             * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
@@ -1157,7 +1158,8 @@ public class DefaultMessageStore implements MessageStore {
 
         return logic;
     }
-
+    // 修正offset，如果当前broker为Slave且设置了不可以从Slave上检查offset，则修正为0，
+    // 如果当前broker为Master或者设置了可以从Slave上检查offset，修正为参数newOffset
     private long nextOffsetCorrection(long oldOffset, long newOffset) {
         long nextOffset = oldOffset;
         if (this.getMessageStoreConfig().getBrokerRole() != BrokerRole.SLAVE || this.getMessageStoreConfig().isOffsetCheckInSlave()) {

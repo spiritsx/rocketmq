@@ -145,7 +145,6 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
         return parseSubscribeMessageQueues(result);
     }
 
-    // 看不懂这个方法在干啥。。入参和出参一样
     public Set<MessageQueue> parseSubscribeMessageQueues(Set<MessageQueue> queueSet) {
         Set<MessageQueue> resultQueues = new HashSet<MessageQueue>();
         for (MessageQueue messageQueue : queueSet) {

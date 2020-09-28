@@ -259,6 +259,7 @@ public class MQClientInstance {
     }
 
     private void startScheduledTask() {
+        // 如果没设置nameSrvAddr，定期用http请求拉取nameSrv地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
@@ -272,7 +273,7 @@ public class MQClientInstance {
                 }
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
-
+        // 定期从nameSrv拉取topic路由消息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -284,7 +285,7 @@ public class MQClientInstance {
                 }
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
-
+        // 定期清理下线broker，向所有broker发送心跳消息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -297,7 +298,7 @@ public class MQClientInstance {
                 }
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
-
+        // 定期持久化消费offset，对集群模式，是发送到broker，是广播模式，是保存到本地
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -607,7 +608,7 @@ public class MQClientInstance {
             }
         }
     }
-
+    // 从nameSrv拉取最新的topic路由消息
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
@@ -616,7 +617,7 @@ public class MQClientInstance {
                     TopicRouteData topicRouteData;
                     if (isDefault && defaultMQProducer != null) {
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
-                            1000 * 3);
+                            1000 * 3); // 拿到TBW102这个默认topic
                         if (topicRouteData != null) {
                             for (QueueData data : topicRouteData.getQueueDatas()) {
                                 int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());
@@ -630,8 +631,8 @@ public class MQClientInstance {
                     if (topicRouteData != null) {
                         TopicRouteData old = this.topicRouteTable.get(topic);
                         boolean changed = topicRouteDataIsChange(old, topicRouteData);
-                        if (!changed) {
-                            changed = this.isNeedUpdateTopicRouteInfo(topic);
+                        if (!changed) { // 路由信息没改变
+                            changed = this.isNeedUpdateTopicRouteInfo(topic); // 在此判断是否改变
                         } else {
                             log.info("the topic[{}] route info changed, old[{}] ,new[{}]", topic, old, topicRouteData);
                         }
@@ -1044,12 +1045,12 @@ public class MQClientInstance {
         boolean found = false;
 
         HashMap<Long/* brokerId */, String/* address */> map = this.brokerAddrTable.get(brokerName);
-        if (map != null && !map.isEmpty()) {
+        if (map != null && !map.isEmpty()) { // 先尝试用建议的brokerId找
             brokerAddr = map.get(brokerId);
             slave = brokerId != MixAll.MASTER_ID;
             found = brokerAddr != null;
 
-            if (!found && !onlyThisBroker) {
+            if (!found && !onlyThisBroker) { // 建议的brokerId不存在，且没设置只从这个broker找，就从map中找到第一个
                 Entry<Long, String> entry = map.entrySet().iterator().next();
                 brokerAddr = entry.getValue();
                 slave = entry.getKey() != MixAll.MASTER_ID;

@@ -480,12 +480,12 @@ public class MappedFileQueue {
                         targetFile = this.mappedFiles.get(index);
                     } catch (Exception ignored) {
                     }
-                    // offset落在了targetFile中间
+                    // offset落在了targetFile的起始offset和结束offset之间
                     if (targetFile != null && offset >= targetFile.getFileFromOffset()
                         && offset < targetFile.getFileFromOffset() + this.mappedFileSize) {
                         return targetFile;
                     }
-                    // offset没落在targetFile中间，需要一个个迭代
+                    // offset没落在targetFile的起始offset和结束offset中间，需要一个个迭代
                     for (MappedFile tmpMappedFile : this.mappedFiles) {
                         if (offset >= tmpMappedFile.getFileFromOffset()
                             && offset < tmpMappedFile.getFileFromOffset() + this.mappedFileSize) {
@@ -493,7 +493,7 @@ public class MappedFileQueue {
                         }
                     }
                 }
-                // 还没找到，估计有问题，如果设置了没找到还返回的话就返回第一个
+                // 还没找到，估计有问题，如果设置了"没找到还返回"的话就返回第一个
                 if (returnFirstOnNotFound) {
                     return firstMappedFile;
                 }

@@ -91,7 +91,6 @@ public class RebalancePushImplTest {
         when(mqClientInstance.findConsumerIdList(anyString(), anyString())).thenReturn(Collections.singletonList(consumerGroup));
         when(mqClientInstance.getClientId()).thenReturn(consumerGroup);
         when(defaultMQPushConsumer.getOffsetStore()).thenReturn(offsetStore);
-
         doAnswer(new Answer() {
             @Override
             public Object answer(final InvocationOnMock invocation) throws Throwable {

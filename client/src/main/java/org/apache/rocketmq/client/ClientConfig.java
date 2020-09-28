@@ -58,7 +58,7 @@ public class ClientConfig {
     private boolean useTLS = TlsSystemConfig.tlsEnable;
 
     private LanguageCode language = LanguageCode.JAVA;
-
+    //格式为ip@instanceName，instanceName在客户端设置
     public String buildMQClientId() {
         StringBuilder sb = new StringBuilder();
         sb.append(this.getClientIP());

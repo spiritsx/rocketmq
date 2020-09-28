@@ -255,8 +255,8 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                       RemotingCommand request,
                                       MessageExt msg, TopicConfig topicConfig) {
         String newTopic = requestHeader.getTopic();
-        if (null != newTopic && newTopic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
-            String groupName = newTopic.substring(MixAll.RETRY_GROUP_TOPIC_PREFIX.length());
+        if (null != newTopic && newTopic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) { // 重试topic的消息
+            String groupName = newTopic.substring(MixAll.RETRY_GROUP_TOPIC_PREFIX.length()); // 拿到消费者组group
             SubscriptionGroupConfig subscriptionGroupConfig =
                 this.brokerController.getSubscriptionGroupManager().findSubscriptionGroupConfig(groupName);
             if (null == subscriptionGroupConfig) {
@@ -267,16 +267,16 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             }
 
             int maxReconsumeTimes = subscriptionGroupConfig.getRetryMaxTimes();
-            if (request.getVersion() >= MQVersion.Version.V3_4_9.ordinal()) {
+            if (request.getVersion() >= MQVersion.Version.V3_4_9.ordinal()) { // 3.4.9以上可重试次数设置在请求头里了
                 maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();
             }
             int reconsumeTimes = requestHeader.getReconsumeTimes() == null ? 0 : requestHeader.getReconsumeTimes();
-            if (reconsumeTimes >= maxReconsumeTimes) {
+            if (reconsumeTimes >= maxReconsumeTimes) {// 这条消息的重试次数已经大于最大可重试次数，放入DLQ里
                 newTopic = MixAll.getDLQTopic(groupName);
                 int queueIdInt = Math.abs(this.random.nextInt() % 99999999) % DLQ_NUMS_PER_GROUP;
                 topicConfig = this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(newTopic,
                     DLQ_NUMS_PER_GROUP,
-                    PermName.PERM_WRITE, 0
+                    PermName.PERM_WRITE, 0 // DLQ原始权限设置为只写不读
                 );
                 msg.setTopic(newTopic);
                 msg.setQueueId(queueIdInt);
@@ -352,7 +352,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         PutMessageResult putMessageResult = null;
         Map<String, String> oriProps = MessageDecoder.string2messageProperties(requestHeader.getProperties());
         String traFlag = oriProps.get(MessageConst.PROPERTY_TRANSACTION_PREPARED);
-        if (traFlag != null && Boolean.parseBoolean(traFlag)) {
+        if (traFlag != null && Boolean.parseBoolean(traFlag)) { // 事务消息，判断broker是否配置了拒绝事务消息
             if (this.brokerController.getBrokerConfig().isRejectTransactionMessage()) {
                 response.setCode(ResponseCode.NO_PERMISSION);
                 response.setRemark(

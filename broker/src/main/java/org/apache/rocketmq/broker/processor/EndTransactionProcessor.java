@@ -62,9 +62,9 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             return response;
         }
 
-        if (requestHeader.getFromTransactionCheck()) {
+        if (requestHeader.getFromTransactionCheck()) { // 来自回查
             switch (requestHeader.getCommitOrRollback()) {
-                case MessageSysFlag.TRANSACTION_NOT_TYPE: {
+                case MessageSysFlag.TRANSACTION_NOT_TYPE: { // 无事务状态,直接返回
                     LOGGER.warn("Check producer[{}] transaction state, but it's pending status."
                             + "RequestHeader: {} Remark: {}",
                         RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
@@ -73,7 +73,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
                     return null;
                 }
 
-                case MessageSysFlag.TRANSACTION_COMMIT_TYPE: {
+                case MessageSysFlag.TRANSACTION_COMMIT_TYPE: { // 事务提交
                     LOGGER.warn("Check producer[{}] transaction state, the producer commit the message."
                             + "RequestHeader: {} Remark: {}",
                         RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
@@ -83,7 +83,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
                     break;
                 }
 
-                case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE: {
+                case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE: { // 事务回滚
                     LOGGER.warn("Check producer[{}] transaction state, the producer rollback the message."
                             + "RequestHeader: {} Remark: {}",
                         RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
@@ -124,7 +124,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         OperationResult result = new OperationResult();
         if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == requestHeader.getCommitOrRollback()) {
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
-            if (result.getResponseCode() == ResponseCode.SUCCESS) {
+            if (result.getResponseCode() == ResponseCode.SUCCESS) { // 找到了prepare消息
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
                     MessageExtBrokerInner msgInner = endMessageTransaction(result.getPrepareMessage());
@@ -132,7 +132,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
                     msgInner.setQueueOffset(requestHeader.getTranStateTableOffset());
                     msgInner.setPreparedTransactionOffset(requestHeader.getCommitLogOffset());
                     msgInner.setStoreTimestamp(result.getPrepareMessage().getStoreTimestamp());
-                    RemotingCommand sendResult = sendFinalMessage(msgInner);
+                    RemotingCommand sendResult = sendFinalMessage(msgInner); // 将消息存到真正的topic里去
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
@@ -163,6 +163,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
     private RemotingCommand checkPrepareMessage(MessageExt msgExt, EndTransactionRequestHeader requestHeader) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         if (msgExt != null) {
+            // 检验原消息的PGroup、offset、commitLogOffset是否都正常
             final String pgroupRead = msgExt.getProperty(MessageConst.PROPERTY_PRODUCER_GROUP);
             if (!pgroupRead.equals(requestHeader.getProducerGroup())) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -189,7 +190,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         response.setCode(ResponseCode.SUCCESS);
         return response;
     }
-
+    // 从prepare消息中还原消息原来的属性
     private MessageExtBrokerInner endMessageTransaction(MessageExt msgExt) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC));

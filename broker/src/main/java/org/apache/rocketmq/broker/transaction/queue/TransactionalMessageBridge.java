@@ -52,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TransactionalMessageBridge {
     private static final InternalLogger LOGGER = InnerLoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 
-    private final ConcurrentHashMap<MessageQueue, MessageQueue> opQueueMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<MessageQueue /*HALF_QUEUE*/, MessageQueue /*OP_HALF_QUEUE*/> opQueueMap = new ConcurrentHashMap<>();
     private final BrokerController brokerController;
     private final MessageStore store;
     private final SocketAddress storeHost;
@@ -191,6 +191,7 @@ public class TransactionalMessageBridge {
     }
 
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
+        // 将原消息的topic、queueId都存到消息属性里
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID,
             String.valueOf(msgInner.getQueueId()));
@@ -201,7 +202,7 @@ public class TransactionalMessageBridge {
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
         return msgInner;
     }
-
+    // 删除事务消息真正的操作，是在RMQ_SYS_TRANS_OP_HALF_TOPIC里添加一个tag里包含REMOVETAG(d)的消息，消息体就是offset
     public boolean putOpMessage(MessageExt messageExt, String opType) {
         MessageQueue messageQueue = new MessageQueue(messageExt.getTopic(),
             this.brokerController.getBrokerConfig().getBrokerName(), messageExt.getQueueId());
@@ -262,10 +263,10 @@ public class TransactionalMessageBridge {
         return msgInner;
     }
 
-    private MessageExtBrokerInner makeOpMessageInner(Message message, MessageQueue messageQueue) {
+    private MessageExtBrokerInner makeOpMessageInner(Message message, MessageQueue messageQueue /*op_half_queue*/) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
-        msgInner.setTopic(message.getTopic());
-        msgInner.setBody(message.getBody());
+        msgInner.setTopic(message.getTopic()); // op_half_topic
+        msgInner.setBody(message.getBody()); // half_topic_offset
         msgInner.setQueueId(messageQueue.getQueueId());
         msgInner.setTags(message.getTags());
         msgInner.setTagsCode(MessageExtBrokerInner.tagsString2tagsCode(msgInner.getTags()));
@@ -305,7 +306,7 @@ public class TransactionalMessageBridge {
     }
 
     private void writeOp(Message message, MessageQueue mq) {
-        MessageQueue opQueue;
+        MessageQueue opQueue; // 找到op_half_queue
         if (opQueueMap.containsKey(mq)) {
             opQueue = opQueueMap.get(mq);
         } else {
