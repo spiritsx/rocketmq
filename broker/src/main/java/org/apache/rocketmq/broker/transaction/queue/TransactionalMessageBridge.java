@@ -228,14 +228,16 @@ public class TransactionalMessageBridge {
             return false;
         }
     }
-
+    // PROPERTY_TRANSACTION_PREPARED_QUEUE_OFFSET是为了避免重复回查。试想有一个事务消息59s到达，halfOffset=1，
+    // 60s开始执行事务回查，发现没过期，重新投递，此时的halfOffset=2,61s，本地事务执行完毕，opQueue有了一个opOffset=1->halfOffset=1的映射
+    // 若不添加这么一个属性，则重新投递的halfOffset=2的消息在下一次事务回查又需要触发事务回查
     public MessageExtBrokerInner renewImmunityHalfMessageInner(MessageExt msgExt) {
         MessageExtBrokerInner msgInner = renewHalfMessageInner(msgExt);
         String queueOffsetFromPrepare = msgExt.getUserProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED_QUEUE_OFFSET);
-        if (null != queueOffsetFromPrepare) {
+        if (null != queueOffsetFromPrepare) { // 有这个属性，说明已经是prepare消息重新投递得到的，仍然使用之前的queueOffset
             MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED_QUEUE_OFFSET,
-                String.valueOf(queueOffsetFromPrepare));
-        } else {
+                    queueOffsetFromPrepare);
+        } else { // 没有这个属性，是生产者投递的，把当前的queueOffset作为属性加到里面
             MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED_QUEUE_OFFSET,
                 String.valueOf(msgExt.getQueueOffset()));
         }

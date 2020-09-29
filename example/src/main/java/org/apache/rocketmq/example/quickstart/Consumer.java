@@ -32,7 +32,7 @@ public class Consumer {
         /*
          * Instantiate with specified consumer group name.
          */
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("wms_dynamic_hit_consumer");
+        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("pushConsumer");
 
         /*
          * Specify name server addresses.
@@ -55,7 +55,7 @@ public class Consumer {
         /*
          * Subscribe one more more topics to consume.
          */
-        consumer.subscribe("dynamic_hit", "*");
+        consumer.subscribe("pull_test_topic", "*");
         consumer.setMaxReconsumeTimes(2);
         /*
          *  Register callback to execute on arrival of messages fetched from brokers.

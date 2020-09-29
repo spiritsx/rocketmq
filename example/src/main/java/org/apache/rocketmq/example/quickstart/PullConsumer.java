@@ -12,6 +12,7 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -23,15 +24,24 @@ public class PullConsumer {
     public static void main(String[] args) throws MQClientException, RemotingException, InterruptedException, MQBrokerException {
         DefaultMQPullConsumer consumer = new DefaultMQPullConsumer("pullConsumer");
         consumer.setNamesrvAddr("localhost:9876");
+        consumer.setPersistConsumerOffsetInterval(3000);
         consumer.start();
-        Set<MessageQueue> topicTest = consumer.fetchSubscribeMessageQueues("test_group-test_app-topic");
+        Set<MessageQueue> topicTest = consumer.fetchSubscribeMessageQueues("pull_test_topic");
+        List<Long> offsets = new ArrayList<>();
         for (MessageQueue messageQueue : topicTest) {
             long offset = consumer.fetchConsumeOffset(messageQueue, true);
-            PullResult pull = consumer.pull(messageQueue, "*", offset, 1);
+            PullResult pull = consumer.pull(messageQueue, "*", offset, 100);
             List<MessageExt> msgFoundList = pull.getMsgFoundList();
             for (MessageExt messageExt : msgFoundList) {
                 System.out.println(messageExt);
             }
+            consumer.updateConsumeOffset(messageQueue, pull.getNextBeginOffset());
+            offsets.add(pull.getNextBeginOffset());
+        }
+        Thread.sleep(21000);
+        int i = 0;
+        for (MessageQueue messageQueue : topicTest) {
+            consumer.updateConsumeOffset(messageQueue, offsets.get(i++));
         }
     }
 }

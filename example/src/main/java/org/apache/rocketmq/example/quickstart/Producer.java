@@ -31,7 +31,7 @@ public class Producer {
         /*
          * Instantiate with a producer group name.
          */
-        DefaultMQProducer producer = new DefaultMQProducer("wms_dynamic_hit_producer");
+        DefaultMQProducer producer = new DefaultMQProducer("pull_test_producer");
 
         /*
          * Specify name server addresses.
@@ -44,7 +44,7 @@ public class Producer {
          * }
          * </pre>
          */
-//        producer.setNamesrvAddr("172.16.7.115:9876;172.16.7.120:9876");
+//        producer.setNamesrvAddr("172.16.7.114:9876");
         producer.setNamesrvAddr("127.0.0.1:9876");
         /*
          * Launch the instance.
@@ -53,13 +53,13 @@ public class Producer {
         producer.setRetryTimesWhenSendFailed(3);
         producer.start();
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10; i++) {
             try {
 
                 /*
                  * Create a message instance, specifying topic, tag and message body.
                  */
-                Message msg = new Message("dynamic_hit" /* Topic */,
+                Message msg = new Message("pull_test_topic" /* Topic */,
                         "*" /* Tag */,
                         ("message test for biz console" + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );

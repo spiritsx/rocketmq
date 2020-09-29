@@ -47,7 +47,6 @@ public class TransactionProducer {
         producer.setExecutorService(executorService);
         producer.setTransactionListener(transactionListener);
         producer.start();
-
         String[] tags = new String[] {"TagA", "TagB", "TagC", "TagD", "TagE"};
         for (int i = 0; i < 10; i++) {
             try {

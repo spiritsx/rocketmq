@@ -205,15 +205,15 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                         if (null != checkImmunityTimeStr) { // 如果消息设置了回查过期时间
                             // 如果消息设置的回查过期时间为-1，则用配置的过期时间，否则将其转化为毫秒
                             checkImmunityTime = getImmunityTime(checkImmunityTimeStr, transactionTimeout);
-                            if (valueOfCurrentMinusBorn < checkImmunityTime) { // 如果事务消息还没过期
-                                if (checkPrepareQueueOffset(removeMap, doneOpOffset, msgExt)) { // 如果已经回查过了，跳过
+                            if (valueOfCurrentMinusBorn < checkImmunityTime) { // 如果事务消息还没过期，这里可以转回成：now < transactionTimeout + bornTime
+                                if (checkPrepareQueueOffset(removeMap, doneOpOffset, msgExt)) { // 如果已经回查过或重新投递到MQ了，跳过
                                     newOffset = i + 1;
                                     i++;
                                     continue;
                                 }
                             }
                         } else { // 消息没设置回查过期时间，用默认配置比较
-                            if ((0 <= valueOfCurrentMinusBorn) && (valueOfCurrentMinusBorn < checkImmunityTime)) { // 消息没到期，跳过
+                            if ((0 <= valueOfCurrentMinusBorn) && (valueOfCurrentMinusBorn < checkImmunityTime)) { // 如果事务消息还没过期
                                 log.debug("New arrived, the miss offset={}, check it later checkImmunity={}, born={}", i,
                                     checkImmunityTime, new Date(msgExt.getBornTimestamp()));
                                 break;
@@ -333,19 +333,19 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     private boolean checkPrepareQueueOffset(HashMap<Long, Long> removeMap, List<Long> doneOpOffset,
         MessageExt msgExt) {
         String prepareQueueOffsetStr = msgExt.getUserProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED_QUEUE_OFFSET);
-        if (null == prepareQueueOffsetStr) {
+        if (null == prepareQueueOffsetStr) { // 没有这个属性，说明是producer投递的
             return putImmunityMsgBackToHalfQueue(msgExt);
-        } else {
+        } else { // 有这个属性，说明是被重新投递到prepareQueue里的，这个offset永远是第一次投递到prepareQueue的queueOffset
             long prepareQueueOffset = getLong(prepareQueueOffsetStr);
             if (-1 == prepareQueueOffset) {
                 return false;
             } else {
-                if (removeMap.containsKey(prepareQueueOffset)) {
+                if (removeMap.containsKey(prepareQueueOffset)) { // 回查过了
                     long tmpOpOffset = removeMap.remove(prepareQueueOffset);
                     doneOpOffset.add(tmpOpOffset);
                     return true;
                 } else {
-                    return putImmunityMsgBackToHalfQueue(msgExt);
+                    return putImmunityMsgBackToHalfQueue(msgExt); // 还没回查过，重新投递到prepareQueue里
                 }
             }
         }
