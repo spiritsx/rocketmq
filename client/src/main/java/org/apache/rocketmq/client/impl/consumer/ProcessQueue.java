@@ -86,6 +86,7 @@ public class ProcessQueue {
             try {
                 this.lockTreeMap.readLock().lockInterruptibly();
                 try {
+                    // 第一个消息消费超时60s了
                     if (!msgTreeMap.isEmpty() && System.currentTimeMillis() - Long.parseLong(MessageAccessor.getConsumeStartTimeStamp(msgTreeMap.firstEntry().getValue())) > pushConsumer.getConsumeTimeout() * 60 * 1000) {
                         msg = msgTreeMap.firstEntry().getValue();
                     } else {
@@ -100,7 +101,7 @@ public class ProcessQueue {
             }
 
             try {
-
+                // 将消息发到重试队列，并从原来的容器移除
                 pushConsumer.sendMessageBack(msg, 3);
                 log.info("send expire msg back. topic={}, msgId={}, storeHost={}, queueId={}, queueOffset={}", msg.getTopic(), msg.getMsgId(), msg.getStoreHost(), msg.getQueueId(), msg.getQueueOffset());
                 try {

@@ -136,7 +136,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             response.setRemark(null);
             return response;
         }
-
+        // 重试topic名字为 `%RETRY%${ConsumerGroupName}`
         String newTopic = MixAll.getRetryTopic(requestHeader.getGroup());
         int queueIdInt = Math.abs(this.random.nextInt() % 99999999) % subscriptionGroupConfig.getRetryQueueNums();
 
@@ -160,7 +160,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             response.setRemark(String.format("the topic[%s] sending message is forbidden", newTopic));
             return response;
         }
-
+        // 根据消息offset拿到原始消息
         MessageExt msgExt = this.brokerController.getMessageStore().lookMessageByOffset(requestHeader.getOffset());
         if (null == msgExt) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -180,7 +180,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         if (request.getVersion() >= MQVersion.Version.V3_4_9.ordinal()) {
             maxReconsumeTimes = requestHeader.getMaxReconsumeTimes();
         }
-
+        // 超过最大重试次数，或者设置delayLevel=-1，投递到死信队列
         if (msgExt.getReconsumeTimes() >= maxReconsumeTimes
             || delayLevel < 0) {
             newTopic = MixAll.getDLQTopic(requestHeader.getGroup());

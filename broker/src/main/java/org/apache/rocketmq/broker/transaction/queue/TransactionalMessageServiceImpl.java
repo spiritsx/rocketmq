@@ -251,7 +251,6 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
             log.error("Check error", e);
         }
 

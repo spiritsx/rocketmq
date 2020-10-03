@@ -1151,7 +1151,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
         return queueTimeSpan;
     }
-
+    // 恢复重试队列名，因为重试消息是从SCHEDULE_TOPIC拉取的
     public void resetRetryAndNamespace(final List<MessageExt> msgs, String consumerGroup) {
         final String groupTopic = MixAll.getRetryTopic(consumerGroup);
         for (MessageExt msg : msgs) {

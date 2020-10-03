@@ -34,9 +34,9 @@ public class SubscriptionGroupConfig {
 
     private long brokerId = MixAll.MASTER_ID;
 
-    private long whichBrokerWhenConsumeSlowly = 1;
+    private long whichBrokerWhenConsumeSlowly = 1; // 如果消息堵塞，则向这个brokerId所属的broker拉取消息
 
-    private boolean notifyConsumerIdsChangedEnable = true;
+    private boolean notifyConsumerIdsChangedEnable = true; // 当消费者变化时立即进行rebalance
 
     public String getGroupName() {
         return groupName;
