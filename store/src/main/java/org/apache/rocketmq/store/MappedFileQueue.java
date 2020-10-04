@@ -37,14 +37,14 @@ public class MappedFileQueue {
 
     private final String storePath;
 
-    private final int mappedFileSize;
+    private final int mappedFileSize; // 单个文件的存储大小，对于commitLog是1G，对于consumeQueue是30W*20
 
-    private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
+    private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>(); // mappedFile文件集合
 
-    private final AllocateMappedFileService allocateMappedFileService;
+    private final AllocateMappedFileService allocateMappedFileService; // 分配mappedFile服务类
 
-    private long flushedWhere = 0;
-    private long committedWhere = 0;
+    private long flushedWhere = 0; // 当前刷盘指针
+    private long committedWhere = 0; // 当前数据提交指针，也即ByteBuffer当前的写指针
 
     private volatile long storeTimestamp = 0;
 
@@ -73,7 +73,7 @@ public class MappedFileQueue {
             }
         }
     }
-
+    // 从第一个文件开始查找，直到找到一个'上次修改时间'大于当前时间戳的文件，如果没找到，返回最后一个文件
     public MappedFile getMappedFileByTime(final long timestamp) {
         Object[] mappedFiles = this.copyMappedFiles(0);
 
@@ -193,17 +193,17 @@ public class MappedFileQueue {
 
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
         long createOffset = -1;
-        MappedFile mappedFileLast = getLastMappedFile();
+        MappedFile mappedFileLast = getLastMappedFile(); // 找到mappedFile文件数组中的最后一个文件
 
-        if (mappedFileLast == null) {
+        if (mappedFileLast == null) { // 如果最后一个文件为空，就需要重新创建，以startOffset相对mappedFileSize的整数倍为起始位移
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
 
-        if (mappedFileLast != null && mappedFileLast.isFull()) {
+        if (mappedFileLast != null && mappedFileLast.isFull()) { // 如果最后一个文件不为空但是满了，也需要重新创建，且以上一个文件起始位移+文件大小作为新的起始位移
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
-        if (createOffset != -1 && needCreate) {
+        if (createOffset != -1 && needCreate) { // 如果需要重新创建且起始位移合法，就重新分配一个mappedFile
             String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
             String nextNextFilePath = this.storePath + File.separator
                 + UtilAll.offset2FileName(createOffset + this.mappedFileSize);
@@ -473,19 +473,20 @@ public class MappedFileQueue {
                         this.mappedFileSize,
                         this.mappedFiles.size());
                 } else {
-                    // index是文件列表的索引，通过2个位移的差值都除以单个文件的大小计算得出
+                    // index是从文件数组找到文件的下标值，通过2个位移的差值都除以单个文件的大小计算得出，
+                    // 这里不能简单的用 offset/mappedFileSize得到下标，因为文件会被定时清理，firstMappedFile的起始偏移量不一定是0
                     int index = (int) ((offset / this.mappedFileSize) - (firstMappedFile.getFileFromOffset() / this.mappedFileSize));
                     MappedFile targetFile = null;
                     try {
                         targetFile = this.mappedFiles.get(index);
                     } catch (Exception ignored) {
                     }
-                    // offset落在了targetFile的起始offset和结束offset之间
+                    // 查找目标文件成功，且offset落在了targetFile的起始offset和结束offset之间
                     if (targetFile != null && offset >= targetFile.getFileFromOffset()
                         && offset < targetFile.getFileFromOffset() + this.mappedFileSize) {
                         return targetFile;
                     }
-                    // offset没落在targetFile的起始offset和结束offset中间，需要一个个迭代
+                    // 查找目标文件失败，又或者offset没有落在targetFile的起始offset和结束offset中间，需要一个个迭代
                     for (MappedFile tmpMappedFile : this.mappedFiles) {
                         if (offset >= tmpMappedFile.getFileFromOffset()
                             && offset < tmpMappedFile.getFileFromOffset() + this.mappedFileSize) {

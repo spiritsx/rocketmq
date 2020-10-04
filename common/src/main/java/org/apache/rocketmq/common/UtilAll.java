@@ -85,9 +85,9 @@ public class UtilAll {
 
     public static String offset2FileName(final long offset) {
         final NumberFormat nf = NumberFormat.getInstance();
-        nf.setMinimumIntegerDigits(20);
-        nf.setMaximumFractionDigits(0);
-        nf.setGroupingUsed(false);
+        nf.setMinimumIntegerDigits(20); // 设置整数最小位数
+        nf.setMaximumFractionDigits(0); // 设置最大小数位数
+        nf.setGroupingUsed(false); // 是否设置分组，比如像100W，英文里会写成1,000,000，如果不使用分组就直接写成1000000
         return nf.format(offset);
     }
 

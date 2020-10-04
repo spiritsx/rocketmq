@@ -31,8 +31,8 @@ public class SubscriptionData implements Comparable<SubscriptionData> {
     private boolean classFilterMode = false; // 是否是类过滤模式
     private String topic;
     private String subString; // 消息过滤表达式，多个用 || 隔开
-    private Set<String> tagsSet = new HashSet<String>(); // 消息过滤tag集合
-    private Set<Integer> codeSet = new HashSet<Integer>(); // 消息过滤tag的hashcode集合
+    private Set<String> tagsSet = new HashSet<>(); // 消息过滤tag集合
+    private Set<Integer> codeSet = new HashSet<>(); // 消息过滤tag的hashcode集合
     private long subVersion = System.currentTimeMillis();
     private String expressionType = ExpressionType.TAG;
 

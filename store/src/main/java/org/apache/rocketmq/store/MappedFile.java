@@ -212,8 +212,8 @@ public class MappedFile extends ReferenceResource {
         // 先获取当前写指针
         int currentPos = this.wrotePosition.get();
 
-        if (currentPos < this.fileSize) {
-            ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
+        if (currentPos < this.fileSize) { // 如果当前写指针大于文件大小说明已写满，这里判断是否有剩余可写空间
+            ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice(); // 拿到剩余可写的buffer
             byteBuffer.position(currentPos);
             AppendMessageResult result = null;
             if (messageExt instanceof MessageExtBrokerInner) {
@@ -223,7 +223,7 @@ public class MappedFile extends ReferenceResource {
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
-            this.wrotePosition.addAndGet(result.getWroteBytes());
+            this.wrotePosition.addAndGet(result.getWroteBytes()); // 写位置增加写入容量
             this.storeTimestamp = result.getStoreTimestamp();
             return result;
         }
@@ -494,17 +494,17 @@ public class MappedFile extends ReferenceResource {
     public void setCommittedPosition(int pos) {
         this.committedPosition.set(pos);
     }
-
+    // 预热mappedFile
     public void warmMappedFile(FlushDiskType type, int pages) {
         long beginTime = System.currentTimeMillis();
         ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
         int flush = 0;
         long time = System.currentTimeMillis();
         for (int i = 0, j = 0; i < this.fileSize; i += MappedFile.OS_PAGE_SIZE, j++) {
-            byteBuffer.put(i, (byte) 0);
+            byteBuffer.put(i, (byte) 0); // 全部填充为0
             // force flush when flush disk type is sync
-            if (type == FlushDiskType.SYNC_FLUSH) {
-                if ((i / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE) >= pages) {
+            if (type == FlushDiskType.SYNC_FLUSH) { // 如果同步刷盘，调用force方法强制刷盘
+                if ((i / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE) >= pages) { // 内存中的大小-已刷盘大小的大于需要预热的大小
                     flush = i;
                     mappedByteBuffer.force();
                 }

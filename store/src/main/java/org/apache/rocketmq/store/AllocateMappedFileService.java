@@ -37,17 +37,17 @@ import org.apache.rocketmq.store.config.BrokerRole;
 public class AllocateMappedFileService extends ServiceThread {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static int waitTimeOut = 1000 * 5;
-    private ConcurrentMap<String, AllocateRequest> requestTable =
-        new ConcurrentHashMap<String, AllocateRequest>();
+    private ConcurrentMap<String /*filePath*/, AllocateRequest> requestTable =
+            new ConcurrentHashMap<>();
     private PriorityBlockingQueue<AllocateRequest> requestQueue =
-        new PriorityBlockingQueue<AllocateRequest>();
+            new PriorityBlockingQueue<>();
     private volatile boolean hasException = false;
     private DefaultMessageStore messageStore;
 
     public AllocateMappedFileService(DefaultMessageStore messageStore) {
         this.messageStore = messageStore;
     }
-
+    // 提前分配好下一个mappedFile
     public MappedFile putRequestAndReturnMappedFile(String nextFilePath, String nextNextFilePath, int fileSize) {
         int canSubmitRequests = 2;
         if (this.messageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
@@ -59,7 +59,7 @@ public class AllocateMappedFileService extends ServiceThread {
 
         AllocateRequest nextReq = new AllocateRequest(nextFilePath, fileSize);
         boolean nextPutOK = this.requestTable.putIfAbsent(nextFilePath, nextReq) == null;
-
+        // 先放入requestTable再放入requestQueue
         if (nextPutOK) {
             if (canSubmitRequests <= 0) {
                 log.warn("[NOTIFYME]TransientStorePool is not enough, so create mapped file error, " +
@@ -166,10 +166,10 @@ public class AllocateMappedFileService extends ServiceThread {
                 MappedFile mappedFile;
                 if (messageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                     try {
-                        mappedFile = ServiceLoader.load(MappedFile.class).iterator().next();
+                        mappedFile = ServiceLoader.load(MappedFile.class).iterator().next(); // SPI实现自定义mappedFile
                         mappedFile.init(req.getFilePath(), req.getFileSize(), messageStore.getTransientStorePool());
                     } catch (RuntimeException e) {
-                        log.warn("Use default implementation.");
+                        log.warn("Use default implementation."); // 没有SPI，还是用默认实现
                         mappedFile = new MappedFile(req.getFilePath(), req.getFileSize(), messageStore.getTransientStorePool());
                     }
                 } else {
@@ -183,7 +183,7 @@ public class AllocateMappedFileService extends ServiceThread {
                         + " " + req.getFilePath() + " " + req.getFileSize());
                 }
 
-                // pre write mappedFile
+                // pre write mappedFile 预热mappedFile
                 if (mappedFile.getFileSize() >= this.messageStore.getMessageStoreConfig()
                     .getMapedFileSizeCommitLog()
                     &&
@@ -204,7 +204,7 @@ public class AllocateMappedFileService extends ServiceThread {
             log.warn(this.getServiceName() + " service has exception. ", e);
             this.hasException = true;
             if (null != req) {
-                requestQueue.offer(req);
+                requestQueue.offer(req); // 发生IO异常，重新写会请求推了，休眠1ms再试
                 try {
                     Thread.sleep(1);
                 } catch (InterruptedException ignored) {
@@ -260,7 +260,7 @@ public class AllocateMappedFileService extends ServiceThread {
         public void setMappedFile(MappedFile mappedFile) {
             this.mappedFile = mappedFile;
         }
-
+        // 按文件大小升序排列
         public int compareTo(AllocateRequest other) {
             if (this.fileSize < other.fileSize)
                 return 1;

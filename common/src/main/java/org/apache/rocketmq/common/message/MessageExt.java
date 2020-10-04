@@ -88,7 +88,7 @@ public class MessageExt extends Message {
     public ByteBuffer getStoreHostBytes() {
         return socketAddress2ByteBuffer(this.storeHost);
     }
-
+    // 将存储地址(ip:port)存放到参数byteBuffer里
     public ByteBuffer getStoreHostBytes(ByteBuffer byteBuffer) {
         return socketAddress2ByteBuffer(this.storeHost, byteBuffer);
     }
