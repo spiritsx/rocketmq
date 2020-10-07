@@ -127,7 +127,7 @@ public abstract class ServiceThread implements Runnable {
     }
 
     protected void waitForRunning(long interval) {
-        if (hasNotified.compareAndSet(true, false)) {
+        if (hasNotified.compareAndSet(true, false)) { // 已经唤醒过了，等待结束
             this.onWaitEnd();
             return;
         }

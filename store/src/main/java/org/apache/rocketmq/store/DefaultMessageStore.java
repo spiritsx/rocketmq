@@ -176,6 +176,8 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            // broker启动时，会在store目录下创建abort文件，退出时通过注册jvm钩子删除abort文件
+            // 所以如果这个文件存在，则说明是异常退出
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
@@ -263,7 +265,7 @@ public class DefaultMessageStore implements MessageStore {
              *  2. DLedger committedPos may be missing, so here just require dispatchBehindBytes <= 0
              */
             while (true) {
-                if (dispatchBehindBytes() <= 0) {
+                if (dispatchBehindBytes() <= 0) { // 发送落后消息
                     break;
                 }
                 Thread.sleep(1000);
@@ -1330,6 +1332,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private void recover(final boolean lastExitOK) {
+        // 先加载consumeQueue，并拿到最大commitLogOffset
         long maxPhyOffsetOfConsumeQueue = this.recoverConsumeQueue();
 
         if (lastExitOK) {
@@ -1359,7 +1362,7 @@ public class DefaultMessageStore implements MessageStore {
             map.put(queueId, consumeQueue);
         }
     }
-
+    // 对每一个consumeQueue都调用recover方法，并得到最大的commitLogOffset
     private long recoverConsumeQueue() {
         long maxPhysicOffset = -1;
         for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
@@ -1373,7 +1376,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return maxPhysicOffset;
     }
-
+    // 重建topic-queueId与最大commitOffset的映射关系
     public void recoverTopicQueueTable() {
         HashMap<String/* topic-queueid */, Long/* offset */> table = new HashMap<String, Long>(1024);
         long minPhyOffset = this.commitLog.getMinOffset();
@@ -1486,7 +1489,7 @@ public class DefaultMessageStore implements MessageStore {
         @Override
         public void dispatch(DispatchRequest request) {
             final int tranType = MessageSysFlag.getTransactionValue(request.getSysFlag());
-            switch (tranType) {
+            switch (tranType) { // 只构建无事务和已完成事务的consumeQueue
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
                     DefaultMessageStore.this.putMessagePositionInfo(request);
@@ -1707,7 +1710,7 @@ public class DefaultMessageStore implements MessageStore {
             return CleanConsumeQueueService.class.getSimpleName();
         }
     }
-
+    // 调用flush方法周期性刷盘
     class FlushConsumeQueueService extends ServiceThread {
         private static final int RETRY_TIMES_OVER = 3;
         private long lastFlushTimestamp = 0;
@@ -1715,7 +1718,7 @@ public class DefaultMessageStore implements MessageStore {
         private void doFlush(int retryTimes) {
             int flushConsumeQueueLeastPages = DefaultMessageStore.this.getMessageStoreConfig().getFlushConsumeQueueLeastPages();
 
-            if (retryTimes == RETRY_TIMES_OVER) {
+            if (retryTimes == RETRY_TIMES_OVER) { // shutdown时不要求最少脏页
                 flushConsumeQueueLeastPages = 0;
             }
 
@@ -1723,10 +1726,10 @@ public class DefaultMessageStore implements MessageStore {
 
             int flushConsumeQueueThoroughInterval = DefaultMessageStore.this.getMessageStoreConfig().getFlushConsumeQueueThoroughInterval();
             long currentTimeMillis = System.currentTimeMillis();
-            if (currentTimeMillis >= (this.lastFlushTimestamp + flushConsumeQueueThoroughInterval)) {
+            if (currentTimeMillis >= (this.lastFlushTimestamp + flushConsumeQueueThoroughInterval)) { // 已经超过刷盘间隔，强制性刷盘
                 this.lastFlushTimestamp = currentTimeMillis;
                 flushConsumeQueueLeastPages = 0;
-                logicsMsgTimestamp = DefaultMessageStore.this.getStoreCheckpoint().getLogicsMsgTimestamp();
+                logicsMsgTimestamp = DefaultMessageStore.this.getStoreCheckpoint().getLogicsMsgTimestamp(); // 拿到上次consumeQueue刷盘时间
             }
 
             ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
@@ -1830,17 +1833,19 @@ public class DefaultMessageStore implements MessageStore {
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
+                        // 虽然smbr是通过reputFromOffset找到，但这里将这个reputFromOffset反赋值给smbr的起始偏移量，大概是追求稳妥吧。。
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            // 从result返回的ByteBuffer中循环读取消息，一次读取一条，构建DispatchRequest对象
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
-                                if (size > 0) {
+                                if (size > 0) { // dispatchRequest返回的长度大于0，准备dispatch
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
-
+                                    // broker开启了长轮询，调用观察者（RequestHoldService）的arriving方法
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                         && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),

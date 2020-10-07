@@ -21,7 +21,7 @@ import java.util.Map;
 public class DispatchRequest {
     private final String topic;
     private final int queueId;
-    private final long commitLogOffset;
+    private final long commitLogOffset; // 消息的物理位置偏移量，对应phyOffset
     private int msgSize;
     private final long tagsCode;
     private final long storeTimestamp;

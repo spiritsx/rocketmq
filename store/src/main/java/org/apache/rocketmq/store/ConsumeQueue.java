@@ -87,7 +87,7 @@ public class ConsumeQueue {
     public void recover() {
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
-
+            // 从倒数第三个文件开始恢复，如果不足3个则从第1个开始恢复
             int index = mappedFiles.size() - 3;
             if (index < 0)
                 index = 0;
@@ -153,8 +153,8 @@ public class ConsumeQueue {
 
     // 通过时间戳查找对应的位移，采用2分法加速查找
     public long getOffsetInQueueByTime(final long timestamp) {
-        // 在文件修改时间大于参数timestamp的mapperFile中，查找修改时间最晚的一个
-        // 如果没有修改时间大于timestamp的则取最后一个文件
+        // 在文件修改时间大于参数timestamp的mappedFile中，查找修改时间最晚的一个
+        // 如果没有修改时间大于timestamp的文件，则取mappedFileQueue最后一个文件
         MappedFile mappedFile = this.mappedFileQueue.getMappedFileByTime(timestamp);
         if (mappedFile != null) {
             long offset = 0;
@@ -162,52 +162,53 @@ public class ConsumeQueue {
             int high = 0;
             int midOffset = -1, targetOffset = -1, leftOffset = -1, rightOffset = -1;
             long leftIndexValue = -1L, rightIndexValue = -1L;
-            long minPhysicOffset = this.defaultMessageStore.getMinPhyOffset();
-            SelectMappedBufferResult sbr = mappedFile.selectMappedBuffer(0);
+            long minPhysicOffset = this.defaultMessageStore.getMinPhyOffset(); // commitLog中存储最小的offset
+            SelectMappedBufferResult sbr = mappedFile.selectMappedBuffer(0); // 返回整个consumeQueue可读的ByteBuffer部分
             if (null != sbr) {
                 ByteBuffer byteBuffer = sbr.getByteBuffer();
                 high = byteBuffer.limit() - CQ_STORE_UNIT_SIZE;
                 try {
                     while (high >= low) {
                         midOffset = (low + high) / (2 * CQ_STORE_UNIT_SIZE) * CQ_STORE_UNIT_SIZE;
-                        byteBuffer.position(midOffset);
+                        byteBuffer.position(midOffset); // 定位到midOffset，读取8字节，对应了CommitLogOffset
                         long phyOffset = byteBuffer.getLong();
-                        int size = byteBuffer.getInt();
-                        if (phyOffset < minPhysicOffset) {
-                            low = midOffset + CQ_STORE_UNIT_SIZE;
+                        int size = byteBuffer.getInt(); // 继续读4字节，对应了消息的totalSize
+                        if (phyOffset < minPhysicOffset) { // 这个commitLogOffset小于当前commitLog中最小的offset，说明目标肯定大于midOffset
+                            low = midOffset + CQ_STORE_UNIT_SIZE; // 将2分法左区间变为mid+1
                             leftOffset = midOffset;
                             continue;
                         }
-
+                        // 走到这里说明查找到的commitLogOffset有效，取出这个消息的存储时间
                         long storeTime =
                             this.defaultMessageStore.getCommitLog().pickupStoreTimestamp(phyOffset, size);
-                        if (storeTime < 0) {
+                        if (storeTime < 0) { // 非法消息
                             return 0;
-                        } else if (storeTime == timestamp) {
+                        } else if (storeTime == timestamp) { // 存储时间正好等于查找时间，跳出循环
                             targetOffset = midOffset;
                             break;
-                        } else if (storeTime > timestamp) {
+                        } else if (storeTime > timestamp) { // 存储时间大于查找时间，将右区间变为mid-1
                             high = midOffset - CQ_STORE_UNIT_SIZE;
                             rightOffset = midOffset;
                             rightIndexValue = storeTime;
-                        } else {
+                        } else { // 存储时间小于查找时间，将左区间变为mid+1
                             low = midOffset + CQ_STORE_UNIT_SIZE;
                             leftOffset = midOffset;
                             leftIndexValue = storeTime;
                         }
                     }
 
-                    if (targetOffset != -1) {
+                    if (targetOffset != -1) { // 目标offset不为-1，说明找到了
 
                         offset = targetOffset;
                     } else {
                         if (leftIndexValue == -1) {
-
+                            // leftIndexValue为-1，说明查找区间一直从右往左缩进，直到退出循环，退出时的右区间是大于目标时间戳且最接近目标offset的偏移量
                             offset = rightOffset;
                         } else if (rightIndexValue == -1) {
-
+                            // leftIndexValue为-1，说明查找区间一直从左往右缩进，直到退出循环，退出时的左区间是小于目标时间戳且最接近目标offset的偏移量
                             offset = leftOffset;
-                        } else {
+                        } else { // target==-1, leftIndexValue!=-1, rightIndexValue!=-1, 说明没找到对应的offset，且查找区间左右两边都缩小了
+                            // 比较时间戳与左右两个区间的时间戳哪个更近，则取对应的
                             offset =
                                 Math.abs(timestamp - leftIndexValue) > Math.abs(timestamp
                                     - rightIndexValue) ? rightOffset : leftOffset;
@@ -337,7 +338,7 @@ public class ConsumeQueue {
         this.correctMinOffset(offset);
         return cnt;
     }
-
+    // 根据指定的commitLogOffset修正consumeQueue的逻辑offset(类似于下标)
     public void correctMinOffset(long phyMinOffset) {
         MappedFile mappedFile = this.mappedFileQueue.getFirstMappedFile();
         long minExtAddr = 1;
@@ -425,28 +426,29 @@ public class ConsumeQueue {
      * @param offset    commitLogOffset
      * @param size      msgSize
      * @param tagsCode  tagsCode
-     * @param cqOffset  ConsumeQueue 中已经记录了多少条消息的偏移量
+     * @param cqOffset  ConsumeQueue中下一条要记录消息的偏移量
      * @return
      */
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
-
+        // 当前待写入的commitLogOffset加上消息的totalSize小于之前记录的最大commitLogOffset，可能属于重复构建
         if (offset + size <= this.maxPhysicOffset) {
             log.warn("Maybe try to build consume queue repeatedly maxPhysicOffset={} phyOffset={}", maxPhysicOffset, offset);
             return true;
         }
-
+        // 反转，此时position=0，结合下一步设置limit，可以看做调用了byteBufferIndex.clear()，即对上一次操作过的byteBufferIndex进行了清理
         this.byteBufferIndex.flip();
         this.byteBufferIndex.limit(CQ_STORE_UNIT_SIZE);
-        this.byteBufferIndex.putLong(offset);
-        this.byteBufferIndex.putInt(size);
-        this.byteBufferIndex.putLong(tagsCode);
-        // 当前需要存储的消息偏移量
+        this.byteBufferIndex.putLong(offset); // 写入commitLogOffset
+        this.byteBufferIndex.putInt(size); // 写入totalSize
+        this.byteBufferIndex.putLong(tagsCode); // 写入消息tag
+        // 当前需要存储的消息在文件中的偏移量(下标*每个元素大小)
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
 
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
         if (mappedFile != null) {
-
+            // 当前consumeQueue是第一次创建的文件，但consumeQueue的offset不为0、写位置为0，可能发生了截断
+            // 此时需要设置最小逻辑偏移量为当前需要存储的消息偏移量，并填充该offset之前的内容
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
                 this.minLogicOffset = expectLogicOffset;
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);
@@ -459,13 +461,13 @@ public class ConsumeQueue {
             if (cqOffset != 0) {
                 long currentLogicOffset = mappedFile.getWrotePosition() + mappedFile.getFileFromOffset();
 
-                if (expectLogicOffset < currentLogicOffset) {
+                if (expectLogicOffset < currentLogicOffset) { // 待写入的逻辑偏移量小于当前逻辑偏移量写入指针，可能属于重复写入
                     log.warn("Build  consume queue repeatedly, expectLogicOffset: {} currentLogicOffset: {} Topic: {} QID: {} Diff: {}",
                         expectLogicOffset, currentLogicOffset, this.topic, this.queueId, expectLogicOffset - currentLogicOffset);
                     return true;
                 }
 
-                if (expectLogicOffset != currentLogicOffset) {
+                if (expectLogicOffset != currentLogicOffset) { // 待写入的逻辑偏移量不等于当前逻辑偏移量写入指针，属于bug
                     LOG_ERROR.warn(
                         "[BUG]logic queue order maybe wrong, expectLogicOffset: {} currentLogicOffset: {} Topic: {} QID: {} Diff: {}",
                         expectLogicOffset,
@@ -493,18 +495,18 @@ public class ConsumeQueue {
             mappedFile.appendMessage(byteBuffer.array());
         }
     }
-
+    // 这里的startIndex即为queueOffset，正是consumeQueue的下标
     public SelectMappedBufferResult getIndexBuffer(final long startIndex) {
         int mappedFileSize = this.mappedFileSize;
-        long offset = startIndex * CQ_STORE_UNIT_SIZE;
-        if (offset >= this.getMinLogicOffset()) {
+        long offset = startIndex * CQ_STORE_UNIT_SIZE; // 下标*每个元素的大小，得到consumeQueue的逻辑偏移量
+        if (offset >= this.getMinLogicOffset()) { // 大于最小逻辑偏移量
             MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset);
-            if (mappedFile != null) {
-                SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize)); // offset % mappedFileSize取余定位
+            if (mappedFile != null) { // offset % mappedFileSize取余定位，得到文件的相对位移
+                SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize));
                 return result;
             }
         }
-        return null;
+        return null; // 返回null说明该消息已被删除
     }
 
     public ConsumeQueueExt.CqExtUnit getExt(final long offset) {

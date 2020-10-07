@@ -17,12 +17,14 @@
 
 package org.apache.rocketmq.store;
 
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import org.apache.rocketmq.common.UtilAll;
 import org.junit.After;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -120,7 +122,6 @@ public class MappedFileQueueTest {
     @Test
     public void testAppendMessage() {
         final String fixedMsg = "0123456789abcdef";
-
         MappedFileQueue mappedFileQueue =
             new MappedFileQueue("target/unit_test_store/c/", 1024, null);
 

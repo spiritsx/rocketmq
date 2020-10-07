@@ -151,7 +151,7 @@ public class MappedFileQueue {
             // ascending order
             Arrays.sort(files);
             for (File file : files) {
-
+                // 如果文件大小与配置不一致，忽略加载
                 if (file.length() != this.mappedFileSize) {
                     log.warn(file + "\t" + file.length()
                         + " length not matched message store config value, please check it manually");
@@ -160,7 +160,7 @@ public class MappedFileQueue {
 
                 try {
                     MappedFile mappedFile = new MappedFile(file.getPath(), mappedFileSize);
-
+                    // 将3个指针都设置为文件大小
                     mappedFile.setWrotePosition(this.mappedFileSize);
                     mappedFile.setFlushedPosition(this.mappedFileSize);
                     mappedFile.setCommittedPosition(this.mappedFileSize);
@@ -284,7 +284,7 @@ public class MappedFileQueue {
         }
         return true;
     }
-
+    // 返回第一个文件的起始offset
     public long getMinOffset() {
 
         if (!this.mappedFiles.isEmpty()) {
@@ -298,7 +298,7 @@ public class MappedFileQueue {
         }
         return -1;
     }
-
+    // 返回最后一个文件的起始offset+读指针
     public long getMaxOffset() {
         MappedFile mappedFile = getLastMappedFile();
         if (mappedFile != null) {
@@ -306,7 +306,7 @@ public class MappedFileQueue {
         }
         return 0;
     }
-
+    // 返回最后一个文件的起始offset+写指针
     public long getMaxWrotePosition() {
         MappedFile mappedFile = getLastMappedFile();
         if (mappedFile != null) {

@@ -269,7 +269,7 @@ public class CommitLog {
             int sysFlag = byteBuffer.getInt();
 
             long bornTimeStamp = byteBuffer.getLong();
-
+            // 注意这个方法的offset是指从待写入数组的offset处开始写入，而不是从byteBuffer的offset开始读取
             ByteBuffer byteBuffer1 = byteBuffer.get(bytesContent, 0, 8);
 
             long storeTimestamp = byteBuffer.getLong();
@@ -816,7 +816,7 @@ public class CommitLog {
 
     public long getMinOffset() {
         MappedFile mappedFile = this.mappedFileQueue.getFirstMappedFile();
-        if (mappedFile != null) {
+        if (mappedFile != null) { // 如果第一个文件不为空且可用，就返回第一个文件的起始位移
             if (mappedFile.isAvailable()) {
                 return mappedFile.getFileFromOffset();
             } else {
@@ -831,15 +831,15 @@ public class CommitLog {
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMapedFileSizeCommitLog();
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, offset == 0);
         if (mappedFile != null) {
-            int pos = (int) (offset % mappedFileSize); // 找到相对偏移量
-            return mappedFile.selectMappedBuffer(pos, size);
+            int pos = (int) (offset % mappedFileSize); // 找到某一个文件内的相对偏移量
+            return mappedFile.selectMappedBuffer(pos, size); // 从该偏移量开始，读取size长度的内容
         }
         return null;
     }
 
     public long rollNextFile(final long offset) {
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMapedFileSizeCommitLog();
-        return offset + mappedFileSize - offset % mappedFileSize;
+        return offset + mappedFileSize - offset % mappedFileSize; // 保证下一个文件位移是mappedFileSize整数倍
     }
 
     public HashMap<String, Long> getTopicQueueTable() {

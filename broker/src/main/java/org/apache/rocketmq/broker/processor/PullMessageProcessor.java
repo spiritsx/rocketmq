@@ -404,10 +404,10 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                     }
                     break;
                 case ResponseCode.PULL_NOT_FOUND:
-
+                    // 没有找到消息，并且允许broker挂起
                     if (brokerAllowSuspend && hasSuspendFlag) {
-                        long pollingTimeMills = suspendTimeoutMillisLong;
-                        if (!this.brokerController.getBrokerConfig().isLongPollingEnable()) {
+                        long pollingTimeMills = suspendTimeoutMillisLong; // 长轮询时间，PUSH为15秒，PULL默认20秒
+                        if (!this.brokerController.getBrokerConfig().isLongPollingEnable()) { // 没开启长轮询，设置为短轮训
                             pollingTimeMills = this.brokerController.getBrokerConfig().getShortPollingTimeMills();
                         }
 

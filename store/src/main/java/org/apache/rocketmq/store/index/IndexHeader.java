@@ -29,13 +29,13 @@ public class IndexHeader {
     private static int hashSlotcountIndex = 32;
     private static int indexCountIndex = 36;
     private final ByteBuffer byteBuffer;
-    private AtomicLong beginTimestamp = new AtomicLong(0);
-    private AtomicLong endTimestamp = new AtomicLong(0);
-    private AtomicLong beginPhyOffset = new AtomicLong(0);
-    private AtomicLong endPhyOffset = new AtomicLong(0);
+    private AtomicLong beginTimestamp = new AtomicLong(0);//该索引文件包含消息的最小时间戳
+    private AtomicLong endTimestamp = new AtomicLong(0); // 该索引文件包含消息的最大时间戳
+    private AtomicLong beginPhyOffset = new AtomicLong(0); // 该索引文件包含消息的最小偏移量（commitLog的偏移量）
+    private AtomicLong endPhyOffset = new AtomicLong(0); // 该索引文件包含消息的最大偏移量
     private AtomicInteger hashSlotCount = new AtomicInteger(0);
 
-    private AtomicInteger indexCount = new AtomicInteger(1);
+    private AtomicInteger indexCount = new AtomicInteger(1); // Index列表已使用的个数，index按顺序存储
 
     public IndexHeader(final ByteBuffer byteBuffer) {
         this.byteBuffer = byteBuffer;

@@ -44,22 +44,27 @@ import sun.nio.ch.DirectBuffer;
 public class MappedFile extends ReferenceResource {
     public static final int OS_PAGE_SIZE = 1024 * 4;//操作系统页缓存大小
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
-    // JVM映射虚拟内存总大小
+    // 当前JVM实例映射虚拟内存总大小
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
-    // JVM中mmap数量
+    // 当前JVM实例中mmap数量
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
     // 当前写文件位置
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
-    //ADD BY ChenYang 当前提交位置
+    //ADD BY ChenYang 当前提交位置。如果开启transientStorePool，则数据会先存储在transientStorePool，
+    // 再提交到MappedByteBuffer，最后刷盘
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
     // 当前刷盘位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
     // 文件大小
     protected int fileSize;
-    // 文件映射
+    // 文件通道
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
+     * 当开启transientStorePool时，writeBuffer不为空。引入该机制主要的原因是提供一种内存锁定，
+     * 保持当前堆外内存一直在内存中，避免被进程swap到磁盘。
+     * 实际上writeBuffer和mappedBytebuffer，2个buffer一直通过slice间接操作，并没有直接修改position和limit，
+     * 所以返回的byteBuffer的position和limit依然和最初一样
      */
     protected ByteBuffer writeBuffer = null;
     protected TransientStorePool transientStorePool = null;
@@ -135,7 +140,7 @@ public class MappedFile extends ReferenceResource {
                 break;
             }
         }
-
+        // 如果通过attachment方法拿到的ByteBuffer为null，说明没有其他buffer引用这个ByteBuffer
         ByteBuffer viewedBuffer = (ByteBuffer) invoke(buffer, methodName);
         if (viewedBuffer == null)
             return buffer;
@@ -312,7 +317,7 @@ public class MappedFile extends ReferenceResource {
             return this.wrotePosition.get();
         }
         if (this.isAbleToCommit(commitLeastPages)) {
-            if (this.hold()) {
+            if (this.hold()) { // 还持有这个文件
                 commit0(commitLeastPages);
                 this.release();
             } else {
@@ -320,7 +325,7 @@ public class MappedFile extends ReferenceResource {
             }
         }
 
-        // All dirty data has been committed to FileChannel.
+        // All dirty data has been committed to FileChannel. 归还writeBuffer
         if (writeBuffer != null && this.transientStorePool != null && this.fileSize == this.committedPosition.get()) {
             this.transientStorePool.returnBuffer(writeBuffer);
             this.writeBuffer = null;
@@ -329,7 +334,7 @@ public class MappedFile extends ReferenceResource {
         return this.committedPosition.get();
     }
 
-    // 提交是指将MappedFile的writeBuffer中数据提交到FileChannel中
+    // 提交是指将MappedFile的writeBuffer中数据提交到FileChannel内存映射中
     protected void commit0(final int commitLeastPages) {
         int writePos = this.wrotePosition.get();
         int lastCommittedPosition = this.committedPosition.get();
@@ -349,32 +354,32 @@ public class MappedFile extends ReferenceResource {
     }
 
     private boolean isAbleToFlush(final int flushLeastPages) {
-        int flush = this.flushedPosition.get();
+        int flush = this.flushedPosition.get(); // 拿到刷盘指针
         int write = getReadPosition();
 
-        if (this.isFull()) {
+        if (this.isFull()) { // 文件写满了，需要flush
             return true;
         }
 
-        if (flushLeastPages > 0) {
+        if (flushLeastPages > 0) { // 文件没写满，如果最少flush页数不小于0，则需要计算当前的脏页
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= flushLeastPages;
         }
 
-        return write > flush;
+        return write > flush; // 如果最少flush的页数小于等于0，则只要有写完没刷盘的就刷盘
     }
-
+    // 判断是否可以执行commit操作
     protected boolean isAbleToCommit(final int commitLeastPages) {
         int flush = this.committedPosition.get();
         int write = this.wrotePosition.get();
-
+        // 文件已满，可以commit
         if (this.isFull()) {
             return true;
         }
-
+        // 文件没满，判断是否有足够脏页，具体是比较当前写指针与上一次commit指针的差值除以页大小，得到脏页数量，比较最少提交需要的藏页数
         if (commitLeastPages > 0) {
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= commitLeastPages;
         }
-
+        // 脏页数小于0，则只要有写入就提交
         return write > flush;
     }
 
@@ -420,7 +425,7 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.position(pos);
                 int size = readPosition - pos;
                 ByteBuffer byteBufferNew = byteBuffer.slice();
-                byteBufferNew.limit(size);
+                byteBufferNew.limit(size); // byteBufferNew的position是pos，limit是size
                 return new SelectMappedBufferResult(this.fileFromOffset + pos, byteBufferNew, size, this);
             }
         }
@@ -448,7 +453,7 @@ public class MappedFile extends ReferenceResource {
         log.info("unmap file[REF:" + currentRef + "] " + this.fileName + " OK");
         return true;
     }
-
+    // 参数intervalForcibly表示拒绝被销毁的最大存活时间
     public boolean destroy(final long intervalForcibly) {
         this.shutdown(intervalForcibly);
 
@@ -485,7 +490,7 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
-     * @return The max position which have valid data
+     * @return The max position which have valid data 根据writeBuffer是否为空拿到已commit位置的指针
      */
     public int getReadPosition() {
         return this.writeBuffer == null ? this.wrotePosition.get() : this.committedPosition.get();

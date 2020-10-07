@@ -64,7 +64,7 @@ public class IndexService {
                 try {
                     IndexFile f = new IndexFile(file.getPath(), this.hashSlotNum, this.indexNum, 0, 0);
                     f.load();
-
+                    // 如果上一次是异常退出，那么所有刷盘点之后构建的indexFile都需要销毁
                     if (!lastExitOK) {
                         if (f.getEndTimestamp() > this.defaultMessageStore.getStoreCheckpoint()
                             .getIndexMsgTimestamp()) {
@@ -205,12 +205,12 @@ public class IndexService {
             DispatchRequest msg = req;
             String topic = msg.getTopic();
             String keys = msg.getKeys();
-            if (msg.getCommitLogOffset() < endPhyOffset) {
+            if (msg.getCommitLogOffset() < endPhyOffset) { // 可能是重复构建，返回
                 return;
             }
 
             final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
-            switch (tranType) {
+            switch (tranType) { // 不构建回滚消息
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
@@ -219,7 +219,7 @@ public class IndexService {
                     return;
             }
 
-            if (req.getUniqKey() != null) {
+            if (req.getUniqKey() != null) { // 消息的唯一键不为空，则构建到hash索引中
                 indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));
                 if (indexFile == null) {
                     log.error("putKey error commitlog {} uniqkey {}", req.getCommitLogOffset(), req.getUniqKey());
@@ -227,7 +227,7 @@ public class IndexService {
                 }
             }
 
-            if (keys != null && keys.length() > 0) {
+            if (keys != null && keys.length() > 0) { // 消息的自定义key不为空，将同一个消息的多个自定义key都构建到hash索引中
                 String[] keyset = keys.split(MessageConst.KEY_SEPARATOR);
                 for (int i = 0; i < keyset.length; i++) {
                     String key = keyset[i];
@@ -246,6 +246,7 @@ public class IndexService {
     }
 
     private IndexFile putKey(IndexFile indexFile, DispatchRequest msg, String idxKey) {
+        // 如果第一次没有构建成功，可能是写满了，考虑重新创建一个文件，重试写入
         for (boolean ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp()); !ok; ) {
             log.warn("Index file [" + indexFile.getFileName() + "] is full, trying to create another one");
 
@@ -298,10 +299,10 @@ public class IndexService {
         {
             this.readWriteLock.readLock().lock();
             if (!this.indexFileList.isEmpty()) {
-                IndexFile tmp = this.indexFileList.get(this.indexFileList.size() - 1);
-                if (!tmp.isWriteFull()) {
+                IndexFile tmp = this.indexFileList.get(this.indexFileList.size() - 1); // 获取index文件列表的最后一个文件
+                if (!tmp.isWriteFull()) { // 还没写满，直接返回
                     indexFile = tmp;
-                } else {
+                } else { // 写满了，记录一下当前的offset和时间戳，作为新index文件的起始offset和时间戳
                     lastUpdateEndPhyOffset = tmp.getEndPhyOffset();
                     lastUpdateIndexTimestamp = tmp.getEndTimestamp();
                     prevIndexFile = tmp;
@@ -312,7 +313,7 @@ public class IndexService {
         }
 
         if (indexFile == null) {
-            try {
+            try { // 以格式化后的当前时间作为文件名
                 String fileName =
                     this.storePath + File.separator
                         + UtilAll.timeMillisToHumanString(System.currentTimeMillis());
@@ -327,7 +328,7 @@ public class IndexService {
                 this.readWriteLock.writeLock().unlock();
             }
 
-            if (indexFile != null) {
+            if (indexFile != null) { // 将之前的indexFile刷盘
                 final IndexFile flushThisFile = prevIndexFile;
                 Thread flushThread = new Thread(new Runnable() {
                     @Override

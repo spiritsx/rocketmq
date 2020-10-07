@@ -113,7 +113,7 @@ public class UtilAll {
     public static String timeMillisToHumanString() {
         return timeMillisToHumanString(System.currentTimeMillis());
     }
-
+    // 无分隔符的yyyyMMddHHmmssSSS
     public static String timeMillisToHumanString(final long t) {
         Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(t);

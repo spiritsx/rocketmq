@@ -33,7 +33,7 @@ public class MessageStoreConfig {
 
     // CommitLog file size,default is 1G
     private int mapedFileSizeCommitLog = 1024 * 1024 * 1024;
-    // ConsumeQueue file size,default is 30W
+    // ConsumeQueue file size,default is 30W * 20
     private int mapedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
     // enable consume queue ext
     private boolean enableConsumeQueueExt = false;
@@ -110,8 +110,8 @@ public class MessageStoreConfig {
     private int accessMessageInMemoryMaxRatio = 40;
     @ImportantField
     private boolean messageIndexEnable = true;
-    private int maxHashSlotNum = 5000000;
-    private int maxIndexNum = 5000000 * 4;
+    private int maxHashSlotNum = 5000000; // 500w个hash槽
+    private int maxIndexNum = 5000000 * 4; // 2000W个Index
     private int maxMsgsNumBatch = 64;
     @ImportantField
     private boolean messageIndexSafe = false;

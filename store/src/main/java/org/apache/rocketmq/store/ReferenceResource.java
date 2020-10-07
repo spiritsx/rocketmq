@@ -41,11 +41,11 @@ public abstract class ReferenceResource {
     }
 
     public void shutdown(final long intervalForcibly) {
-        if (this.available) {
+        if (this.available) { // 初次调用时available为true，将其设置为false并记录时间戳
             this.available = false;
             this.firstShutdownTimestamp = System.currentTimeMillis();
             this.release();
-        } else if (this.getRefCount() > 0) {
+        } else if (this.getRefCount() > 0) { // 后续调用，仍有引用，如果发现超时，则直接减去1000个引用数
             if ((System.currentTimeMillis() - this.firstShutdownTimestamp) >= intervalForcibly) {
                 this.refCount.set(-1000 - this.getRefCount());
                 this.release();
@@ -69,7 +69,7 @@ public abstract class ReferenceResource {
     }
 
     public abstract boolean cleanup(final long currentRef);
-
+    // 清理完成的标志是引用数小于0，且标志位为true
     public boolean isCleanupOver() {
         return this.refCount.get() <= 0 && this.cleanupOver;
     }
