@@ -66,10 +66,11 @@ public class MessageStoreConfig {
     private int flushIntervalConsumeQueue = 1000;
     // Resource reclaim interval
     private int cleanResourceInterval = 10000;
-    // CommitLog removal interval
+    // CommitLog removal interval 在一次清除过程中，2次删除文件的时间间隔
     private int deleteCommitLogFilesInterval = 100;
     // ConsumeQueue removal interval
     private int deleteConsumeQueueFilesInterval = 100;
+    // 删除文件时, 如果文件被其他线程占用会拒绝删除，该值表示第一次拒绝删除后能保留最大时间
     private int destroyMapedFileIntervalForcibly = 1000 * 120;
     private int redeleteHangedFileInterval = 1000 * 120;
     // When to delete,default is at 4 am

@@ -117,13 +117,13 @@ public class RunningFlags {
 
         return false;
     }
-
+    // true: 之前disk没满  false: 之前disk满了
     public boolean getAndMakeDiskFull() {
         boolean result = !((this.flagBits & DISK_FULL_BIT) == DISK_FULL_BIT);
         this.flagBits |= DISK_FULL_BIT;
         return result;
     }
-
+    // true: 之前disk没满  false: 之前disk满了
     public boolean getAndMakeDiskOK() {
         boolean result = !((this.flagBits & DISK_FULL_BIT) == DISK_FULL_BIT);
         this.flagBits &= ~DISK_FULL_BIT;

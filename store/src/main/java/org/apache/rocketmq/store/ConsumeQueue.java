@@ -99,7 +99,7 @@ public class ConsumeQueue {
             long mappedFileOffset = 0;
             long maxExtAddr = 1;
             while (true) {
-                for (int i = 0; i < mappedFileSizeLogics; i += CQ_STORE_UNIT_SIZE) {
+                for (int i = 0; i < mappedFileSizeLogics; i += CQ_STORE_UNIT_SIZE) { // 一个单元单元的累加
                     long offset = byteBuffer.getLong();
                     int size = byteBuffer.getInt();
                     long tagsCode = byteBuffer.getLong();
@@ -117,9 +117,9 @@ public class ConsumeQueue {
                     }
                 }
 
-                if (mappedFileOffset == mappedFileSizeLogics) {
+                if (mappedFileOffset == mappedFileSizeLogics) { // 遍历完一个完整的mappedFile，继续下一个mappedFile
                     index++;
-                    if (index >= mappedFiles.size()) {
+                    if (index >= mappedFiles.size()) { // 已遍历玩所有的，退出循环
 
                         log.info("recover last consume queue file over, last mapped file "
                             + mappedFile.getFileName());
@@ -131,17 +131,17 @@ public class ConsumeQueue {
                         mappedFileOffset = 0;
                         log.info("recover next consume queue file, " + mappedFile.getFileName());
                     }
-                } else {
+                } else { // 当前遍历完的mappedFile大小没到mappedFile，遍历结束，退出循环
                     log.info("recover current consume queue queue over " + mappedFile.getFileName() + " "
                         + (processOffset + mappedFileOffset));
                     break;
                 }
             }
 
-            processOffset += mappedFileOffset;
+            processOffset += mappedFileOffset; // 加上最后处理的一个
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
-            this.mappedFileQueue.truncateDirtyFiles(processOffset);
+            this.mappedFileQueue.truncateDirtyFiles(processOffset); // 截断
 
             if (isExtReadEnable()) {
                 this.consumeQueueExt.recover();
@@ -338,7 +338,7 @@ public class ConsumeQueue {
         this.correctMinOffset(offset);
         return cnt;
     }
-    // 根据指定的commitLogOffset修正consumeQueue的逻辑offset(类似于下标)
+    // 根据指定的commitLogOffset修正consumeQueue的最小逻辑offset
     public void correctMinOffset(long phyMinOffset) {
         MappedFile mappedFile = this.mappedFileQueue.getFirstMappedFile();
         long minExtAddr = 1;
@@ -351,8 +351,8 @@ public class ConsumeQueue {
                         result.getByteBuffer().getInt();
                         long tagsCode = result.getByteBuffer().getLong();
 
-                        if (offsetPy >= phyMinOffset) {
-                            this.minLogicOffset = mappedFile.getFileFromOffset() + i;
+                        if (offsetPy >= phyMinOffset) { // 如果consumeQueue里存储的commitLogOffset大于指定的commitLogOffset
+                            this.minLogicOffset = mappedFile.getFileFromOffset() + i; // 修正consumeQueue的最小逻辑offset并退出循环
                             log.info("Compute logical min offset: {}, topic: {}, queueId: {}",
                                 this.getMinOffsetInQueue(), this.topic, this.queueId);
                             // This maybe not take effect, when not every consume queue has extend file.

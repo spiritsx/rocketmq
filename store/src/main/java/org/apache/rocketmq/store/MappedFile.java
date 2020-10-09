@@ -64,7 +64,8 @@ public class MappedFile extends ReferenceResource {
      * 当开启transientStorePool时，writeBuffer不为空。引入该机制主要的原因是提供一种内存锁定，
      * 保持当前堆外内存一直在内存中，避免被进程swap到磁盘。
      * 实际上writeBuffer和mappedBytebuffer，2个buffer一直通过slice间接操作，并没有直接修改position和limit，
-     * 所以返回的byteBuffer的position和limit依然和最初一样
+     * 所以返回的byteBuffer的position和limit依然和最初一样，但底层的数组已经被修改了，
+     * 所以每次只需要对共享出来的byteBuffer定好位置，再put到fileChannel中，内容也就随之写入了
      */
     protected ByteBuffer writeBuffer = null;
     protected TransientStorePool transientStorePool = null;
@@ -218,7 +219,7 @@ public class MappedFile extends ReferenceResource {
         int currentPos = this.wrotePosition.get();
 
         if (currentPos < this.fileSize) { // 如果当前写指针大于文件大小说明已写满，这里判断是否有剩余可写空间
-            ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice(); // 拿到剩余可写的buffer
+            ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result = null;
             if (messageExt instanceof MessageExtBrokerInner) {

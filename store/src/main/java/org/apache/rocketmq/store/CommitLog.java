@@ -172,7 +172,7 @@ public class CommitLog {
             long processOffset = mappedFile.getFileFromOffset();
             long mappedFileOffset = 0;
             while (true) {
-                DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover);
+                DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover); // 每次查找一个消息并根据配置判断是否检查crc
                 int size = dispatchRequest.getMsgSize();
                 // Normal data
                 if (dispatchRequest.isSuccess() && size > 0) {
@@ -181,13 +181,13 @@ public class CommitLog {
                 // Come the end of the file, switch to the next file Since the
                 // return 0 representatives met last hole,
                 // this can not be included in truncate offset
-                else if (dispatchRequest.isSuccess() && size == 0) {
+                else if (dispatchRequest.isSuccess() && size == 0) { // 查找成功，且已经到文件末尾了
                     index++;
-                    if (index >= mappedFiles.size()) {
+                    if (index >= mappedFiles.size()) { // 已经恢复完毕
                         // Current branch can not happen
                         log.info("recover last 3 physics file over, last mapped file " + mappedFile.getFileName());
                         break;
-                    } else {
+                    } else { // 还有下一个文件，继续遍历
                         mappedFile = mappedFiles.get(index);
                         byteBuffer = mappedFile.sliceByteBuffer();
                         processOffset = mappedFile.getFileFromOffset();
@@ -196,23 +196,23 @@ public class CommitLog {
                     }
                 }
                 // Intermediate file read error
-                else if (!dispatchRequest.isSuccess()) {
+                else if (!dispatchRequest.isSuccess()) { // 查找不成功，退出循环
                     log.info("recover physics file end, " + mappedFile.getFileName());
                     break;
                 }
             }
 
-            processOffset += mappedFileOffset;
+            processOffset += mappedFileOffset; // 加上最后一次的offset，从这个offset开始截断
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
             // Clear ConsumeQueue redundant data
-            if (maxPhyOffsetOfConsumeQueue >= processOffset) {
+            if (maxPhyOffsetOfConsumeQueue >= processOffset) { // 根据consumeQueue拿到的最大commitLogOffset大于已处理offset，需要从已处理offset开始截断
                 log.warn("maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, processOffset);
                 this.defaultMessageStore.truncateDirtyLogicFiles(processOffset);
             }
-        } else {
+        } else { // 没有commitLog文件了，把consumeQueue都删除
             // Commitlog case files are deleted
             log.warn("The commitlog files are deleted, and delete the consume queue files");
             this.mappedFileQueue.setFlushedWhere(0);
@@ -411,7 +411,7 @@ public class CommitLog {
             // Looking beginning to recover from which file
             int index = mappedFiles.size() - 1;
             MappedFile mappedFile = null;
-            for (; index >= 0; index--) {
+            for (; index >= 0; index--) { // 从最后一个文件开始往前遍历，找到第一个正常的文件
                 mappedFile = mappedFiles.get(index);
                 if (this.isMappedFileMatchedRecover(mappedFile)) {
                     log.info("recover from this mapped file " + mappedFile.getFileName());
@@ -492,18 +492,18 @@ public class CommitLog {
         ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
 
         int magicCode = byteBuffer.getInt(MessageDecoder.MESSAGE_MAGIC_CODE_POSTION);
-        if (magicCode != MESSAGE_MAGIC_CODE) {
+        if (magicCode != MESSAGE_MAGIC_CODE) { // 魔数不匹配，不符合
             return false;
         }
 
         long storeTimestamp = byteBuffer.getLong(MessageDecoder.MESSAGE_STORE_TIMESTAMP_POSTION);
-        if (0 == storeTimestamp) {
+        if (0 == storeTimestamp) { // 存储时间戳为0，不符合
             return false;
         }
 
         if (this.defaultMessageStore.getMessageStoreConfig().isMessageIndexEnable()
             && this.defaultMessageStore.getMessageStoreConfig().isMessageIndexSafe()) {
-            if (storeTimestamp <= this.defaultMessageStore.getStoreCheckpoint().getMinTimestampIndex()) {
+            if (storeTimestamp <= this.defaultMessageStore.getStoreCheckpoint().getMinTimestampIndex()) { // 在刷盘点之前的时间戳，符合
                 log.info("find check timestamp, {} {}",
                     storeTimestamp,
                     UtilAll.timeMillisToHumanString(storeTimestamp));
@@ -925,13 +925,13 @@ public class CommitLog {
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogThoroughInterval();
 
                 long begin = System.currentTimeMillis();
-                if (begin >= (this.lastCommitTimestamp + commitDataThoroughInterval)) {
+                if (begin >= (this.lastCommitTimestamp + commitDataThoroughInterval)) { // 已经过了commit间隔，立刻commit
                     this.lastCommitTimestamp = begin;
                     commitDataLeastPages = 0;
                 }
 
                 try {
-                    boolean result = CommitLog.this.mappedFileQueue.commit(commitDataLeastPages);
+                    boolean result = CommitLog.this.mappedFileQueue.commit(commitDataLeastPages); // 先把writeBuffer提交到fileChannel
                     long end = System.currentTimeMillis();
                     if (!result) {
                         this.lastCommitTimestamp = end; // result = false means some data committed.
@@ -965,7 +965,7 @@ public class CommitLog {
             CommitLog.log.info(this.getServiceName() + " service started");
 
             while (!this.isStopped()) {
-                boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
+                boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed(); // 是否周期性刷盘
 
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
@@ -977,7 +977,7 @@ public class CommitLog {
 
                 // Print flush progress
                 long currentTimeMillis = System.currentTimeMillis();
-                if (currentTimeMillis >= (this.lastFlushTimestamp + flushPhysicQueueThoroughInterval)) {
+                if (currentTimeMillis >= (this.lastFlushTimestamp + flushPhysicQueueThoroughInterval)) { // 已经过了刷盘周期，设置最小脏页为0，强制刷盘
                     this.lastFlushTimestamp = currentTimeMillis;
                     flushPhysicQueueLeastPages = 0;
                     printFlushProgress = (printTimes++ % 10) == 0;
@@ -987,7 +987,7 @@ public class CommitLog {
                     if (flushCommitLogTimed) {
                         Thread.sleep(interval);
                     } else {
-                        this.waitForRunning(interval);
+                        this.waitForRunning(interval);// 使用CountDownLatch休眠，可被唤醒
                     }
 
                     if (printFlushProgress) {
@@ -1097,7 +1097,7 @@ public class CommitLog {
                         // two times the flush
                         boolean flushOK = false;
                         for (int i = 0; i < 2 && !flushOK; i++) {
-                            flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset();
+                            flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset(); // 是否已经刷盘过了
 
                             if (!flushOK) {
                                 CommitLog.this.mappedFileQueue.flush(0);
@@ -1126,7 +1126,7 @@ public class CommitLog {
 
             while (!this.isStopped()) {
                 try {
-                    this.waitForRunning(10);
+                    this.waitForRunning(10);// 每次刷盘完休眠10秒
                     this.doCommit();
                 } catch (Exception e) {
                     CommitLog.log.warn(this.getServiceName() + " service has exception. ", e);
@@ -1195,7 +1195,7 @@ public class CommitLog {
             final MessageExtBrokerInner msgInner) {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
 
-            // PHY OFFSET 文件的offset+当前byteBuffer的position
+            // PHY OFFSET 文件的起始偏移量+当前byteBuffer的position
             long wroteOffset = fileFromOffset + byteBuffer.position();
 
             this.resetByteBuffer(hostHolder, 8);

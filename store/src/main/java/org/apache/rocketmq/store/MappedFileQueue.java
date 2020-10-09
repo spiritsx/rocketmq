@@ -102,16 +102,16 @@ public class MappedFileQueue {
     }
 
     public void truncateDirtyFiles(long offset) {
-        List<MappedFile> willRemoveFiles = new ArrayList<MappedFile>();
+        List<MappedFile> willRemoveFiles = new ArrayList<>();
 
         for (MappedFile file : this.mappedFiles) {
             long fileTailOffset = file.getFileFromOffset() + this.mappedFileSize;
-            if (fileTailOffset > offset) {
-                if (offset >= file.getFileFromOffset()) {
+            if (fileTailOffset > offset) { // 文件的结束offset大于截断offset，需要截断
+                if (offset >= file.getFileFromOffset()) { // 文件的起始offset小于等于截断offset, 则截断部分
                     file.setWrotePosition((int) (offset % this.mappedFileSize));
                     file.setCommittedPosition((int) (offset % this.mappedFileSize));
                     file.setFlushedPosition((int) (offset % this.mappedFileSize));
-                } else {
+                } else { // 文件起始offset已经大于截断offset，则整个截断
                     file.destroy(1000);
                     willRemoveFiles.add(file);
                 }
@@ -120,7 +120,7 @@ public class MappedFileQueue {
 
         this.deleteExpiredFile(willRemoveFiles);
     }
-
+    // 从mappedFile集合中去掉已删除文件
     void deleteExpiredFile(List<MappedFile> files) {
 
         if (!files.isEmpty()) {
@@ -128,7 +128,7 @@ public class MappedFileQueue {
             Iterator<MappedFile> iterator = files.iterator();
             while (iterator.hasNext()) {
                 MappedFile cur = iterator.next();
-                if (!this.mappedFiles.contains(cur)) {
+                if (!this.mappedFiles.contains(cur)) { // 先剔除不包含在当前mappedFiles内的file
                     iterator.remove();
                     log.info("This mappedFile {} is not contained by mappedFiles, so skip it.", cur.getFileName());
                 }
@@ -344,21 +344,21 @@ public class MappedFileQueue {
 
         int mfsLength = mfs.length - 1;
         int deleteCount = 0;
-        List<MappedFile> files = new ArrayList<MappedFile>();
+        List<MappedFile> files = new ArrayList<MappedFile>(); // 需要删除的文件
         if (null != mfs) {
             for (int i = 0; i < mfsLength; i++) {
                 MappedFile mappedFile = (MappedFile) mfs[i];
                 long liveMaxTimestamp = mappedFile.getLastModifiedTimestamp() + expiredTime;
-                if (System.currentTimeMillis() >= liveMaxTimestamp || cleanImmediately) {
-                    if (mappedFile.destroy(intervalForcibly)) {
+                if (System.currentTimeMillis() >= liveMaxTimestamp || cleanImmediately) { // 如果从上次清理后已经经过了‘过期时间’，或立即删除为true
+                    if (mappedFile.destroy(intervalForcibly)) { // 标记关闭、关闭fileChannel、执行物理删除，返回true
                         files.add(mappedFile);
                         deleteCount++;
 
-                        if (files.size() >= DELETE_FILES_BATCH_MAX) {
+                        if (files.size() >= DELETE_FILES_BATCH_MAX) { // 每次批量删除上限
                             break;
                         }
 
-                        if (deleteFilesInterval > 0 && (i + 1) < mfsLength) {
+                        if (deleteFilesInterval > 0 && (i + 1) < mfsLength) { // 配置了删除操作间隔，且还有可疑删除文件
                             try {
                                 Thread.sleep(deleteFilesInterval);
                             } catch (InterruptedException e) {
@@ -424,7 +424,7 @@ public class MappedFileQueue {
 
     public boolean flush(final int flushLeastPages) {
         boolean result = true;
-        MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
+        MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0); // 找到上一次刷盘点所在文件
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
             int offset = mappedFile.flush(flushLeastPages);

@@ -205,10 +205,10 @@ public class UtilAll {
             if (!file.exists())
                 return -1;
 
-            long totalSpace = file.getTotalSpace();
+            long totalSpace = file.getTotalSpace(); // file所属分区总计空间
 
             if (totalSpace > 0) {
-                long freeSpace = file.getFreeSpace();
+                long freeSpace = file.getFreeSpace(); // file所属分区剩余空间
                 long usedSpace = totalSpace - freeSpace;
 
                 return usedSpace / (double) totalSpace;
