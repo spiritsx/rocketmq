@@ -904,7 +904,7 @@ public class BrokerController {
 
     public synchronized void registerBrokerAll(final boolean checkOrderConfig, boolean oneway, boolean forceRegister) {
         TopicConfigSerializeWrapper topicConfigWrapper = this.getTopicConfigManager().buildTopicConfigSerializeWrapper();
-
+        // 如果broker不同时具备可读可写的权限，将topicConfigTable设置到topicConfigWrapper
         if (!PermName.isWriteable(this.getBrokerConfig().getBrokerPermission())
             || !PermName.isReadable(this.getBrokerConfig().getBrokerPermission())) {
             ConcurrentHashMap<String, TopicConfig> topicConfigTable = new ConcurrentHashMap<String, TopicConfig>();
@@ -955,7 +955,7 @@ public class BrokerController {
             }
         }
     }
-
+    // 向nameSrv发送broker当前的topicConfig，比较dataVersion，如果有变化就需要注册
     private boolean needRegister(final String clusterName,
         final String brokerAddr,
         final String brokerName,

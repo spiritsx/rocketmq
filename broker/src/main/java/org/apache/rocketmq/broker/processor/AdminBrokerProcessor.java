@@ -692,11 +692,11 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
                 mq.setQueueId(i);
 
                 OffsetWrapper offsetWrapper = new OffsetWrapper();
-
+                // 查找broker当前queue的最大offset
                 long brokerOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, i);
                 if (brokerOffset < 0)
                     brokerOffset = 0;
-
+                // 查找broker中缓存的消费offset
                 long consumerOffset = this.brokerController.getConsumerOffsetManager().queryOffset(
                     requestHeader.getConsumerGroup(),
                     topic,

@@ -116,7 +116,7 @@ public class MessageStoreConfig {
     private int maxMsgsNumBatch = 64;
     @ImportantField
     private boolean messageIndexSafe = false;
-    private int haListenPort = 10912;
+    private int haListenPort = 10912; // 主从同步使用的端口，默认普通端口+1
     private int haSendHeartbeatInterval = 1000 * 5;
     private int haHousekeepingInterval = 1000 * 20;
     private int haTransferBatchSize = 1024 * 32;

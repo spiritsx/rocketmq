@@ -16,17 +16,22 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
+import com.google.common.xml.XmlEscapers;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
  * This class demonstrates how to send messages to brokers using provided {@link DefaultMQProducer}.
  */
 public class Producer {
-    public static void main(String[] args) throws MQClientException, InterruptedException {
+    public static void main(String[] args) throws MQClientException, InterruptedException, RemotingException, MQBrokerException {
 
         /*
          * Instantiate with a producer group name.
@@ -45,30 +50,30 @@ public class Producer {
          * </pre>
          */
 //        producer.setNamesrvAddr("172.16.7.114:9876");
-        producer.setNamesrvAddr("127.0.0.1:9876");
+        producer.setNamesrvAddr("192.168.6.238:9876");
         /*
          * Launch the instance.
          */
         producer.setSendMsgTimeout(1500);
         producer.setRetryTimesWhenSendFailed(3);
         producer.start();
-
         for (int i = 0; i < 10; i++) {
             try {
 
                 /*
                  * Create a message instance, specifying topic, tag and message body.
                  */
-                Message msg = new Message("pull_test_topic" /* Topic */,
+                String topic = "first_dev_topic";
+                Message msg = new Message(topic/* Topic */,
                         "*" /* Tag */,
                         ("message test for biz console" + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );
-                msg.setKeys("testKey" + (i % 10));
+                msg.setKeys("testKey->" + topic + (i % 10));
                 /*
                  * Call send message to deliver message to one of brokers.
                  */
+//                Thread.sleep(1000);
                 SendResult sendResult = producer.send(msg);
-                Thread.sleep(1000);
                 System.out.printf("%s%n", sendResult);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -79,6 +84,6 @@ public class Producer {
         /*
          * Shut down once the producer instance is not longer in use.
          */
-//        producer.shutdown();
+        producer.shutdown();
     }
 }

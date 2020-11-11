@@ -72,7 +72,7 @@ public class StatsItemSet {
                 }
             }
         }, 0, 1, TimeUnit.HOURS);
-        // 1分钟一次，
+        // 1分钟一次，打印分钟级别指标
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -82,7 +82,7 @@ public class StatsItemSet {
                 }
             }
         }, Math.abs(UtilAll.computNextMinutesTimeMillis() - System.currentTimeMillis()), 1000 * 60, TimeUnit.MILLISECONDS);
-
+        // 1小时一次，打印小时级别指标
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -92,7 +92,7 @@ public class StatsItemSet {
                 }
             }
         }, Math.abs(UtilAll.computNextHourTimeMillis() - System.currentTimeMillis()), 1000 * 60 * 60, TimeUnit.MILLISECONDS);
-
+        // 1天一次，打印天级别指标
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
